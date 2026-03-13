@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+
+  jobs Job[]
+}
+
+model Candidate {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String   @unique
+  phone     String
+  password  String
+  dob       DateTime?
+  location  String?
+  skills    String?
+  resumeUrl String?
+  createdAt DateTime @default(now())
+
+  applications Application[]
+  savedJobs    SavedJob[]
+}
+
+model Job {
+  id          Int      @id @default(autoincrement())
+  title       String
+  department  String
+  location    String
+  experience  Int
+  jobType     String
+  description String
+  deadline    DateTime
+  status      JobStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+
+  createdById Int
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  applications Application[]
+  savedJobs    SavedJob[]
+}
+
+model Application {
+  id          Int      @id @default(autoincrement())
+  candidateId Int
+  jobId       Int
+  status      ApplicationStatus @default(APPLIED)
+  createdAt   DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+  job       Job       @relation(fields: [jobId], references: [id])
+}
+
+model SavedJob {
+  id          Int @id @default(autoincrement())
+  candidateId Int
+  jobId       Int
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+  job       Job       @relation(fields: [jobId], references: [id])
+}
+
+enum Role {
+  HR
+  MANAGER
+}
+
+enum JobStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
