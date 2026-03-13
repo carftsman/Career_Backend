@@ -19,6 +19,16 @@ const options = {
         description: "Render Production Server",
       },
     ],
+
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT"
+        }
+      }
+    }
   },
   apis: ["./src/modules/**/*.js"]
 };

@@ -42,9 +42,15 @@ model Job {
   location    String
   experience  Int
   jobType     String
+
   description String
+  responsibilities String?
+  benefits    String?
+  skills      String
+
   deadline    DateTime
   status      JobStatus @default(ACTIVE)
+
   createdAt   DateTime @default(now())
 
   createdById Int
