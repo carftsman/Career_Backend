@@ -45,7 +45,6 @@ model Job {
 
   description String
   responsibilities String?
-  benefits    String?
   skills      String
 
   deadline    DateTime
@@ -61,28 +60,73 @@ model Job {
 }
 
 model Application {
-  id          Int      @id @default(autoincrement())
-  candidateId Int
-  jobId       Int
-  status      ApplicationStatus @default(APPLIED)
-  createdAt   DateTime @default(now())
+  id Int @id @default(autoincrement())
 
+  candidateId Int
   candidate Candidate @relation(fields: [candidateId], references: [id])
-  job       Job       @relation(fields: [jobId], references: [id])
+
+  jobId Int
+  job Job @relation(fields: [jobId], references: [id])
+
+  // Personal info snapshot
+  firstName String
+  lastName String
+  email String
+  phone String
+  gender String?
+  dob DateTime?
+  address String?
+  city String?
+  state String?
+  country String?
+
+  // Education
+  qualification String?
+  degree String?
+  university String?
+  graduationYear Int?
+  cgpa Float?
+
+  // Work Experience
+  totalExperience Int?
+  currentCompany String?
+  currentRole String?
+  previousCompanies String?
+  achievements String?
+
+  // Resume
+  resumeUrl String?
+
+  // Additional info
+  skills String?
+  certifications String?
+  languages String?
+
+  status ApplicationStatus @default(APPLIED)
+
+  createdAt DateTime @default(now())
+
+  @@unique([candidateId, jobId])
 }
 
 model SavedJob {
-  id          Int @id @default(autoincrement())
-  candidateId Int
-  jobId       Int
+  id Int @id @default(autoincrement())
 
+  candidateId Int
   candidate Candidate @relation(fields: [candidateId], references: [id])
-  job       Job       @relation(fields: [jobId], references: [id])
+
+  jobId Int
+  job Job @relation(fields: [jobId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([candidateId, jobId])
 }
 
 enum Role {
   HR
   MANAGER
+  CANDIDATE
 }
 
 enum JobStatus {

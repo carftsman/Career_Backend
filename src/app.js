@@ -11,12 +11,19 @@ app.use(express.json());
 const authRoutes = require("./modules/auth/auth.routes");
 const candidateRoutes = require("./modules/candidate/candidate.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
+const jobsRoutes = require("./modules/jobs/jobs.routes");
+const candidateJobsRoutes = require("./modules/candidate/candidateJobs.routes");
+const applicantsRoutes = require("./modules/applicants/applicants.routes");
+
 
 
 
 app.use("/api/auth", authRoutes);
 app.use("/api/candidate", candidateRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/jobs", jobsRoutes);
+app.use("/api/candidate", candidateJobsRoutes);
+app.use("/api/applicants", applicantsRoutes);
 
 /* Swagger Documentation */
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));

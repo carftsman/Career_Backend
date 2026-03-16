@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const candidateController = require("./candidate.controller");
 const uploadMiddleware = require("../../middlewares/uploadMiddleware");
+const authMiddleware = require("../../middlewares/authMiddleware");
+const roleMiddleware = require("../../middlewares/roleMiddleware");
 
 /**
  * @swagger
@@ -123,5 +125,57 @@ router.put(
  *         description: Login successful
  */
 router.post("/login", candidateController.login);
+
+/**
+ * @swagger
+ * /api/candidate/profile:
+ *   get:
+ *     summary: Get candidate profile
+ *     description: Returns the logged-in candidate's profile details. Used to autofill the job application form.
+ *     tags: [Candidate]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Candidate profile fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 firstName:
+ *                   type: string
+ *                   example: Sushma
+ *                 lastName:
+ *                   type: string
+ *                   example: Sree
+ *                 email:
+ *                   type: string
+ *                   example: sushma@gmail.com
+ *                 phone:
+ *                   type: string
+ *                   example: "9876543210"
+ *                 location:
+ *                   type: string
+ *                   example: Hyderabad
+ *                 skills:
+ *                   type: string
+ *                   example: NodeJS, React
+ *                 resumeUrl:
+ *                   type: string
+ *                   example: https://storage.blob.core.windows.net/resumes/resume.pdf
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       404:
+ *         description: Candidate not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/profile",
+  authMiddleware,
+  roleMiddleware(["CANDIDATE"]),
+  candidateController.getProfile
+);
 
 module.exports = router;
