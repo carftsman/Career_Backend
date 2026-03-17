@@ -70,6 +70,7 @@ router.get("/:jobId", jobsController.getJobById);
  *           schema:
  *             type: object
  *             required:
+ *               - jobId
  *               - title
  *               - department
  *               - location
@@ -78,7 +79,12 @@ router.get("/:jobId", jobsController.getJobById);
  *               - description
  *               - skills
  *               - deadline
+ *               - hrEmail
+ *               - hrPhone
  *             properties:
+ *               jobId:
+ *                 type: string
+ *                 example: JOB-2026-001
  *               title:
  *                 type: string
  *                 example: Backend Developer
@@ -111,6 +117,12 @@ router.get("/:jobId", jobsController.getJobById);
  *                 format: date
  *                 description: Last date to apply for the job
  *                 example: 2026-06-30
+ *               hrEmail:
+ *                 type: string
+ *                 example: hr@company.com
+ *               hrPhone:
+ *                 type: string
+ *                 example: "9876543210"
  *     responses:
  *       201:
  *         description: Job created successfully

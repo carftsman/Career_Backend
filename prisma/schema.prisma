@@ -37,6 +37,11 @@ model Candidate {
 
 model Job {
   id          Int      @id @default(autoincrement())
+  
+  jobId       String?  @unique   
+  hrEmail     String?            
+  hrPhone     String?            
+
   title       String
   department  String
   location    String
@@ -45,10 +50,11 @@ model Job {
 
   description String
   responsibilities String?
-  skills      String
+  skills      String[]
 
   deadline    DateTime
   status      JobStatus @default(ACTIVE)
+
 
   createdAt   DateTime @default(now())
 

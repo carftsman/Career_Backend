@@ -47,10 +47,10 @@ exports.getJobById = async (req, res) => {
 
 
 exports.createJob = async (req, res) => {
-
   try {
 
     const {
+      jobId,
       title,
       department,
       location,
@@ -59,21 +59,116 @@ exports.createJob = async (req, res) => {
       description,
       responsibilities,
       skills,
-      deadline
+      deadline,
+      hrEmail,
+      hrPhone
     } = req.body;
 
     const createdById = req.user.id;
 
+    //  REQUIRED FIELDS
+    if (
+      !title ||
+      !department ||
+      !location ||
+      !experience ||
+      !jobType ||
+      !description ||
+      !skills ||
+      !deadline ||
+      !hrEmail ||
+      !hrPhone
+    ) {
+      return res.status(400).json({
+        message: "All required fields must be provided"
+      });
+    }
+
+    //  HR EMAIL DOMAIN VALIDATION
+    if (!hrEmail.endsWith("@dhatvibs.com")) {
+      return res.status(400).json({
+        message: "HR email must be from @dhatvibs.com domain"
+      });
+    }
+
+    // PHONE VALIDATION
+    if (hrPhone.length < 8) {
+      return res.status(400).json({
+        message: "Invalid phone number"
+      });
+    }
+
+    //  DEADLINE VALIDATION (FUTURE ONLY)
+    const deadlineDate = new Date(deadline);
+    const today = new Date();
+
+    if (deadlineDate <= today) {
+      return res.status(400).json({
+        message: "Deadline must be a future date"
+      });
+    }
+
+    //  SKILLS ARRAY HANDLING
+    let skillsArray;
+
+    if (Array.isArray(skills)) {
+      skillsArray = skills;
+    } else {
+      // convert "NodeJS, React" → ["NodeJS", "React"]
+      skillsArray = skills.split(",").map(s => s.trim());
+    }
+
+    // GENERATE JOB ID
+    let finalJobId = jobId;
+
+    if (!finalJobId) {
+      const count = await prisma.job.count();
+      finalJobId = `JOB-${new Date().getFullYear()}-${String(count + 1).padStart(3, "0")}`;
+    }
+
+    // CHECK DUPLICATE
+    const existingJob = await prisma.job.findUnique({
+      where: { jobId: finalJobId }
+    });
+
+    if (existingJob) {
+      return res.status(400).json({
+        message: "Job ID already exists"
+      });
+    }
+    //  LOCATION should not be Remote or Full-time
+    const INVALID_LOCATIONS = ["Remote", "Full-time"];
+
+    if (INVALID_LOCATIONS.includes(location)) {
+      return res.status(400).json({
+        message: "Location cannot be Remote or Full-time"
+      });
+    }
+
+    //  JOB TYPE validation (allowed values)
+    const ALLOWED_JOB_TYPES = ["Full-time", "Remote", "Hybrid"];
+
+    if (!ALLOWED_JOB_TYPES.includes(jobType)) {
+      return res.status(400).json({
+        message: "Invalid job type"
+      });
+    }
+
+    // CREATE JOB
     const job = await jobsService.createJob({
+      jobId: finalJobId,
       title,
       department,
       location,
       experience: Number(experience),
       jobType,
       description,
-      responsibilities,
-      skills,
-      deadline: new Date(deadline),
+      responsibilities: responsibilities || null,
+      skills: skillsArray,
+      deadline: deadlineDate,
+      hrEmail,
+      hrPhone,
+      status: "ACTIVE",   //  default
       createdById
     });
 
@@ -83,13 +178,11 @@ exports.createJob = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error(error);
-
-    res.status(500).json({ message: "Internal server error" });
-
+    res.status(500).json({
+      message: "Internal server error"
+    });
   }
-
 };
 
 

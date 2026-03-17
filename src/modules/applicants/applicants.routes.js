@@ -217,4 +217,143 @@ router.get(
   applicantsController.getMonthlyReport
 );
 
+
+/**
+ * @swagger
+ * /api/applicants/candidates:
+ *   get:
+ *     summary: Get registered candidates with filters
+ *     description: Fetch all registered candidates with optional filters like search, location, and skills. Supports pagination.
+ *     tags: [Applicants]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: sushma
+ *         description: Search by first name, last name, or email
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *           example: Hyderabad
+ *         description: Filter candidates by location
+ *       - in: query
+ *         name: skills
+ *         schema:
+ *           type: string
+ *           example: NodeJS
+ *         description: Filter candidates by skills
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *         description: Number of records per page
+ *     responses:
+ *       200:
+ *         description: List of candidates fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                   example: 24
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 10
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       firstName:
+ *                         type: string
+ *                         example: Sushma
+ *                       lastName:
+ *                         type: string
+ *                         example: Sree
+ *                       email:
+ *                         type: string
+ *                         example: sushma@gmail.com
+ *                       phone:
+ *                         type: string
+ *                         example: "9876543210"
+ *                       skills:
+ *                         type: string
+ *                         example: NodeJS, React
+ *                       location:
+ *                         type: string
+ *                         example: Hyderabad
+ *                       resumeUrl:
+ *                         type: string
+ *                         example: https://azureblob/resume.pdf
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       403:
+ *         description: Forbidden - Only HR or Manager can access
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/candidates",
+  applicantsController.getCandidates
+);
+
+/**
+ * @swagger
+ * /api/applicants/candidates/{id}/resume:
+ *   get:
+ *     summary: Get candidate resume
+ *     description: Fetch resume URL of a specific candidate for preview or download.
+ *     tags: [Applicants]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Candidate ID
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Resume fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resumeUrl:
+ *                   type: string
+ *                   example: https://azureblob/resume.pdf
+ *       404:
+ *         description: Candidate or resume not found
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Only HR or Manager can access
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/candidates/:id/resume",
+  applicantsController.getResume
+);
 module.exports = router;

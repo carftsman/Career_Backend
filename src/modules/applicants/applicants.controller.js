@@ -179,3 +179,95 @@ exports.getMonthlyReport = async (req, res) => {
   }
 
 };
+
+exports.getCandidates = async (req, res) => {
+  try {
+
+    const { search, location, skills, page = 1, limit = 10 } = req.query;
+
+    const filters = {};
+
+    if (search) {
+      filters.OR = [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } }
+      ];
+    }
+
+    if (location) {
+      filters.location = {
+        contains: location,
+        mode: "insensitive"
+      };
+    }
+
+    if (skills) {
+      filters.skills = {
+        contains: skills,
+        mode: "insensitive"
+      };
+    }
+
+    const candidates = await prisma.candidate.findMany({
+      where: filters,
+      skip: (page - 1) * limit,
+      take: Number(limit),
+      orderBy: { createdAt: "desc" }
+    });
+
+    const total = await prisma.candidate.count({ where: filters });
+
+    // Transform response for UI
+    const formatted = candidates.map(c => ({
+      id: c.id,
+
+      candidate: `${c.firstName} ${c.lastName}`,   //full name
+
+      contactInfo: {
+        email: c.email,
+        phone: c.phone
+      },
+
+      skills: c.skills,
+      location: c.location,
+      createdAt: c.createdAt,
+      resumeUrl: c.resumeUrl
+    }));
+
+    res.json({
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      data: formatted
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch candidates" });
+  }
+};
+
+exports.getResume = async (req, res) => {
+  try {
+
+    const id = Number(req.params.id);
+
+    const candidate = await prisma.candidate.findUnique({
+      where: { id }
+    });
+
+    if (!candidate || !candidate.resumeUrl) {
+      return res.status(404).json({
+        message: "Resume not found"
+      });
+    }
+
+    res.json({
+      resumeUrl: candidate.resumeUrl
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching resume" });
+  }
+};
