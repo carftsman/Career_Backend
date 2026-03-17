@@ -1,8 +1,23 @@
 const prisma = require("../../prisma");
 
-exports.getJobs = async (status) => {
+exports.getJobs = async (status, search) => {
 
-  const where = status ? { status } : {};
+  const where = {
+    ...(status && { status }),
+
+    ...(search && {
+      OR: [
+        { title: { contains: search, mode: "insensitive" } },
+        { department: { contains: search, mode: "insensitive" } },
+
+        //  if skills is ARRAY
+        { skills: { hasSome: [search] } },
+
+        //  fallback if skills is string (keep if needed)
+        { description: { contains: search, mode: "insensitive" } }
+      ]
+    })
+  };
 
   const jobs = await prisma.job.findMany({
     where,
@@ -14,18 +29,40 @@ exports.getJobs = async (status) => {
     }
   });
 
-  return jobs.map(job => ({
-    id: job.id,
-    title: job.title,
-    department: job.department,
-    location: job.location,
-    experience: job.experience,
-    jobType: job.jobType,
-    status: job.status,
-    applicants: job._count.applications,
-    postedDate: job.createdAt
-  }));
+  const now = new Date();
 
+  return jobs.map(job => {
+
+    let finalStatus = job.status;
+
+    //  Handle deadline passed
+    if (job.deadline && new Date(job.deadline) < now && job.status === "ACTIVE") {
+      finalStatus = "DEADLINE_PASSED";
+    }
+
+    return {
+      id: job.id,
+
+      // Job ID for UI
+      jobId: job.jobId ? `#${job.jobId}` : `#JOB-${job.id}`,
+
+      title: job.title,
+
+      department: job.department,
+
+      location: job.location,
+
+      experience: job.experience,
+
+      jobType: job.jobType,
+
+      status: finalStatus,
+
+      applicants: job._count.applications,
+
+      postedDate: job.createdAt
+    };
+  });
 };
 
 

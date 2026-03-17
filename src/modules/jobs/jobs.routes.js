@@ -10,7 +10,7 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  * /api/jobs:
  *   get:
  *     summary: Get all jobs
- *     description: Fetch all jobs. Optional query param `status` can be used to filter ACTIVE or CLOSED jobs.
+ *     description: Fetch all jobs with optional filters like status and search keyword (title, department, skills).
  *     tags: [Jobs]
  *     parameters:
  *       - in: query
@@ -20,12 +20,62 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  *           enum: [ACTIVE, CLOSED]
  *         required: false
  *         description: Filter jobs by status
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: backend
+ *         required: false
+ *         description: Search jobs by title, department, skills, or description
  *     responses:
  *       200:
  *         description: Jobs fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 jobs:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       jobId:
+ *                         type: string
+ *                         example: "#JOB-2026-001"
+ *                       title:
+ *                         type: string
+ *                         example: Backend Developer
+ *                       department:
+ *                         type: string
+ *                         example: Engineering
+ *                       location:
+ *                         type: string
+ *                         example: Hyderabad
+ *                       experience:
+ *                         type: integer
+ *                         example: 3
+ *                       jobType:
+ *                         type: string
+ *                         example: Full-time
+ *                       status:
+ *                         type: string
+ *                         example: ACTIVE
+ *                       applicants:
+ *                         type: integer
+ *                         example: 5
+ *                       postedDate:
+ *                         type: string
+ *                         format: date-time
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized - Invalid or missing token
+ *       500:
+ *         description: Internal server error
  */
+
 router.get("/", jobsController.getJobs);
 
 

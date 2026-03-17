@@ -4,9 +4,9 @@ exports.getJobs = async (req, res) => {
 
   try {
 
-    const { status } = req.query;
+    const { status , search } = req.query;
 
-    const jobs = await jobsService.getJobs(status);
+    const jobs = await jobsService.getJobs(status , search);
 
     res.json({ jobs });
 
