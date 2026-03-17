@@ -1,12 +1,14 @@
+const prisma = require("../../prisma");
 const jobsService = require("./jobs.service");
+
 
 exports.getJobs = async (req, res) => {
 
   try {
 
-    const { status , search } = req.query;
+    const { status, search } = req.query;
 
-    const jobs = await jobsService.getJobs(status , search);
+    const jobs = await jobsService.getJobs(status, search);
 
     res.json({ jobs });
 
@@ -50,7 +52,6 @@ exports.createJob = async (req, res) => {
   try {
 
     const {
-      jobId,
       title,
       department,
       location,
@@ -84,7 +85,7 @@ exports.createJob = async (req, res) => {
       });
     }
 
-    //  HR EMAIL DOMAIN VALIDATION
+    //  HR EMAIL VALIDATION
     if (!hrEmail.endsWith("@dhatvibs.com")) {
       return res.status(400).json({
         message: "HR email must be from @dhatvibs.com domain"
@@ -92,15 +93,16 @@ exports.createJob = async (req, res) => {
     }
 
     // PHONE VALIDATION
-    if (hrPhone.length < 8) {
+    if (!/^[0-9]{10}$/.test(hrPhone)) {
       return res.status(400).json({
-        message: "Invalid phone number"
+        message: "Phone must be 10 digits"
       });
     }
 
-    //  DEADLINE VALIDATION (FUTURE ONLY)
+    //  DEADLINE VALIDATION
     const deadlineDate = new Date(deadline);
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     if (deadlineDate <= today) {
       return res.status(400).json({
@@ -108,69 +110,82 @@ exports.createJob = async (req, res) => {
       });
     }
 
-    //  SKILLS ARRAY HANDLING
-    let skillsArray;
-
-    if (Array.isArray(skills)) {
-      skillsArray = skills;
-    } else {
-      // convert "NodeJS, React" → ["NodeJS", "React"]
-      skillsArray = skills.split(",").map(s => s.trim());
-    }
-
-    // GENERATE JOB ID
-    let finalJobId = jobId;
-
-    if (!finalJobId) {
-      const count = await prisma.job.count();
-      finalJobId = `JOB-${new Date().getFullYear()}-${String(count + 1).padStart(3, "0")}`;
-    }
-
-    // CHECK DUPLICATE
-    const existingJob = await prisma.job.findUnique({
-      where: { jobId: finalJobId }
-    });
-
-    if (existingJob) {
-      return res.status(400).json({
-        message: "Job ID already exists"
-      });
-    }
-    //  LOCATION should not be Remote or Full-time
+    //  LOCATION VALIDATION
     const INVALID_LOCATIONS = ["Remote", "Full-time"];
-
     if (INVALID_LOCATIONS.includes(location)) {
       return res.status(400).json({
         message: "Location cannot be Remote or Full-time"
       });
     }
 
-    //  JOB TYPE validation (allowed values)
+    //  JOB TYPE VALIDATION
     const ALLOWED_JOB_TYPES = ["Full-time", "Remote", "Hybrid"];
-
     if (!ALLOWED_JOB_TYPES.includes(jobType)) {
       return res.status(400).json({
         message: "Invalid job type"
       });
     }
 
-    // CREATE JOB
-    const job = await jobsService.createJob({
-      jobId: finalJobId,
-      title,
-      department,
-      location,
-      experience: Number(experience),
-      jobType,
-      description,
-      responsibilities: responsibilities || null,
-      skills: skillsArray,
-      deadline: deadlineDate,
-      hrEmail,
-      hrPhone,
-      status: "ACTIVE",   //  default
-      createdById
-    });
+    //  SKILLS ARRAY HANDLING (Prisma String[])
+    let skillsArray;
+
+    if (Array.isArray(skills)) {
+      skillsArray = skills;
+    } else {
+      skillsArray = skills.split(",").map(s => s.trim());
+    }
+
+    //  AUTO JOB ID + DUPLICATE SAFE (RETRY LOGIC)
+    let created = false;
+    let job;
+
+    while (!created) {
+      try {
+
+        const year = new Date().getFullYear();
+
+        const lastJob = await prisma.job.findFirst({
+          orderBy: { id: "desc" }
+        });
+
+        let nextNumber = 1;
+
+        if (lastJob && lastJob.jobId) {
+          const lastNumber = parseInt(lastJob.jobId.split("-").pop());
+          nextNumber = lastNumber + 1;
+        }
+
+        const finalJobId = `JOB-${year}-${String(nextNumber).padStart(3, "0")}`;
+
+        job = await jobsService.createJob({
+          jobId: finalJobId,
+          title,
+          department,
+          location,
+          experience: Number(experience),
+          jobType,
+          description,
+          responsibilities: responsibilities || null,
+          skills: skillsArray,
+          deadline: deadlineDate,
+          hrEmail,
+          hrPhone,
+          status: "ACTIVE",
+          createdById
+        });
+
+        created = true;
+
+      } catch (error) {
+
+        //  Retry if duplicate jobId
+        if (error.code === "P2002") {
+          continue;
+        }
+
+        throw error;
+      }
+    }
 
     res.status(201).json({
       message: "Job created successfully",
@@ -178,10 +193,13 @@ exports.createJob = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+
+    console.error("CREATE JOB ERROR:", error);
+
     res.status(500).json({
       message: "Internal server error"
     });
+
   }
 };
 

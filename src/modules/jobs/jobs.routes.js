@@ -132,9 +132,6 @@ router.get("/:jobId", jobsController.getJobById);
  *               - hrEmail
  *               - hrPhone
  *             properties:
- *               jobId:
- *                 type: string
- *                 example: JOB-2026-001
  *               title:
  *                 type: string
  *                 example: Backend Developer
