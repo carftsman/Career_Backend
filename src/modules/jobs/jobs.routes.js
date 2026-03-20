@@ -166,7 +166,7 @@ router.get("/:jobId", jobsController.getJobById);
  *                 example: 2026-06-30
  *               hrEmail:
  *                 type: string
- *                 example: hr@company.com
+ *                 example: hr@dhatvibs.com
  *               hrPhone:
  *                 type: string
  *                 example: "9876543210"
@@ -238,8 +238,8 @@ router.patch(
  * @swagger
  * /api/jobs/{jobId}/reopen:
  *   patch:
- *     summary: Reopen a job
- *     description: HR can reopen a closed job listing.
+ *     summary: Reopen and update a job
+ *     description: Allows HR to reopen a closed job and optionally update job details like title, skills, deadline, etc. The same jobId will be reused.
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
@@ -247,16 +247,74 @@ router.patch(
  *       - in: path
  *         name: jobId
  *         required: true
+ *         description: ID of the job to reopen
  *         schema:
  *           type: integer
- *         example: 1
+ *           example: 1
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Backend Developer
+ *               department:
+ *                 type: string
+ *                 example: Engineering
+ *               location:
+ *                 type: string
+ *                 example: Hyderabad
+ *               experience:
+ *                 type: integer
+ *                 example: 3
+ *               jobType:
+ *                 type: string
+ *                 example: Full-time
+ *               description:
+ *                 type: string
+ *                 example: Build scalable backend APIs
+ *               responsibilities:
+ *                 type: string
+ *                 example: Develop APIs, optimize performance
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["NodeJS", "PostgreSQL"]
+ *               deadline:
+ *                 type: string
+ *                 format: date
+ *                 example: 2026-08-01
+ *               hrEmail:
+ *                 type: string
+ *                 example: hr@dhatvibs.com
+ *               hrPhone:
+ *                 type: string
+ *                 example: "9876543210"
  *     responses:
  *       200:
  *         description: Job reopened successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Job reopened successfully
+ *                 job:
+ *                   type: object
+ *       400:
+ *         description: Invalid input (e.g., past deadline)
  *       401:
  *         description: Unauthorized
  *       404:
  *         description: Job not found
+ *       500:
+ *         description: Internal server error
  */
 router.patch(
   "/:jobId/reopen",

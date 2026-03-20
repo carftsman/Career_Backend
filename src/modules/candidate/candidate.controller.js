@@ -131,14 +131,54 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.getProfile = async (req, res) => {
+// exports.getProfile = async (req, res) => {
 
+//   try {
+
+//     const candidateId = req.user.id;
+
+//     const candidate = await prisma.candidate.findUnique({
+//       where: { id: candidateId }
+//     });
+
+//     if (!candidate) {
+//       return res.status(404).json({
+//         message: "Candidate not found"
+//       });
+//     }
+
+//     res.json({
+//       firstName: candidate.firstName,
+//       lastName: candidate.lastName,
+//       email: candidate.email,
+//       phone: candidate.phone,
+//       location: candidate.location,
+//       skills: candidate.skills,
+//       resumeUrl: candidate.resumeUrl
+//     });
+
+//   } catch (error) {
+
+//     console.error(error);
+
+//     res.status(500).json({
+//       message: "Failed to fetch profile"
+//     });
+
+//   }
+
+// };
+
+exports.getProfile = async (req, res) => {
   try {
 
     const candidateId = req.user.id;
 
     const candidate = await prisma.candidate.findUnique({
-      where: { id: candidateId }
+      where: { id: candidateId },
+      include: {
+        profile: true
+      }
     });
 
     if (!candidate) {
@@ -148,13 +188,39 @@ exports.getProfile = async (req, res) => {
     }
 
     res.json({
-      firstName: candidate.firstName,
-      lastName: candidate.lastName,
-      email: candidate.email,
-      phone: candidate.phone,
-      location: candidate.location,
-      skills: candidate.skills,
-      resumeUrl: candidate.resumeUrl
+      profile: {
+        //  BASIC DETAILS (from Candidate table)
+        firstName: candidate.firstName,
+        lastName: candidate.lastName,
+        email: candidate.email,
+        phone: candidate.phone,
+        location: candidate.location,
+        resumeUrl: candidate.resumeUrl,
+
+        //  ADVANCED DETAILS (from CandidateProfile)
+        dob: candidate.profile?.dob || null,
+        gender: candidate.profile?.gender || null,
+        address: candidate.profile?.address || null,
+        city: candidate.profile?.city || null,
+        state: candidate.profile?.state || null,
+        country: candidate.profile?.country || null,
+        photoUrl: candidate.profile?.photoUrl || null,
+
+        qualification: candidate.profile?.qualification || null,
+        degree: candidate.profile?.degree || null,
+        university: candidate.profile?.university || null,
+        graduationYear: candidate.profile?.graduationYear || null,
+        cgpa: candidate.profile?.cgpa || null,
+
+        totalExperience: candidate.profile?.totalExperience || null,
+        currentCompany: candidate.profile?.currentCompany || null,
+        currentRole: candidate.profile?.currentRole || null,
+        previousCompanies: candidate.profile?.previousCompanies || null,
+
+        skills: candidate.profile?.skills || [],
+        certificates: candidate.profile?.certificateUrls || [],
+        languages: candidate.profile?.languages || []
+      }
     });
 
   } catch (error) {
@@ -162,9 +228,8 @@ exports.getProfile = async (req, res) => {
     console.error(error);
 
     res.status(500).json({
-      message: "Failed to fetch profile"
+      message: "Internal server error"
     });
 
   }
-
 };

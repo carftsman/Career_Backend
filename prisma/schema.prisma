@@ -33,6 +33,7 @@ model Candidate {
 
   applications Application[]
   savedJobs    SavedJob[]
+  profile      CandidateProfile?
 }
 
 model Job {
@@ -127,6 +128,42 @@ model SavedJob {
   createdAt DateTime @default(now())
 
   @@unique([candidateId, jobId])
+}
+
+model CandidateProfile {
+  id           Int      @id @default(autoincrement())
+
+  candidateId  Int      @unique
+  candidate    Candidate @relation(fields: [candidateId], references: [id])
+
+  // Personal
+  dob          DateTime?
+  gender       String?
+  address      String?
+  city         String?
+  state        String?
+  country      String?
+  photoUrl     String?
+
+  // Education
+  qualification   String?
+  degree          String?
+  university      String?
+  graduationYear  Int?
+  cgpa            Float?
+
+  // Experience
+  totalExperience Int?
+  currentCompany  String?
+  currentRole     String?
+  previousCompanies String?
+
+  // Extra
+  skills         String[]
+  certificateUrls String[]
+  languages      String[]
+
+  createdAt DateTime @default(now())
 }
 
 enum Role {

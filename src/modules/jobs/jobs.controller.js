@@ -229,26 +229,95 @@ exports.closeJob = async (req, res) => {
 
 
 exports.reopenJob = async (req, res) => {
-
   try {
 
     const jobId = Number(req.params.jobId);
 
-    const job = await jobsService.reopenJob(jobId);
+    const {
+      title,
+      department,
+      location,
+      experience,
+      jobType,
+      description,
+      responsibilities,
+      skills,
+      deadline,
+      hrEmail,
+      hrPhone
+    } = req.body;
+
+    //  Find existing job
+    const existingJob = await prisma.job.findUnique({
+      where: { id: jobId }
+    });
+
+    if (!existingJob) {
+      return res.status(404).json({
+        message: "Job not found"
+      });
+    }
+
+    //  SKILLS handling (array)
+    let skillsArray;
+
+    if (skills) {
+      skillsArray = Array.isArray(skills)
+        ? skills
+        : skills.split(",").map(s => s.trim());
+    }
+
+    //  DEADLINE validation (if provided)
+    let deadlineDate;
+
+    if (deadline) {
+      deadlineDate = new Date(deadline);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (deadlineDate <= today) {
+        return res.status(400).json({
+          message: "Deadline must be future date"
+        });
+      }
+    }
+
+    // Update job (NO new jobId)
+    const updatedJob = await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        title: title || existingJob.title,
+        department: department || existingJob.department,
+        location: location || existingJob.location,
+        experience: experience ? Number(experience) : existingJob.experience,
+        jobType: jobType || existingJob.jobType,
+        description: description || existingJob.description,
+        responsibilities: responsibilities ?? existingJob.responsibilities,
+        skills: skillsArray || existingJob.skills,
+        deadline: deadlineDate || existingJob.deadline,
+        hrEmail: hrEmail || existingJob.hrEmail,
+        hrPhone: hrPhone || existingJob.hrPhone,
+
+        // 🔥 MAIN POINT
+        status: "ACTIVE"
+      }
+    });
 
     res.json({
       message: "Job reopened successfully",
-      job
+      job: updatedJob
     });
 
   } catch (error) {
 
-    console.error(error);
+    console.error("REOPEN JOB ERROR:", error);
 
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({
+      message: "Internal server error"
+    });
 
   }
-
 };
 
 exports.updateJob = async (req, res) => {

@@ -14,7 +14,7 @@ const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const jobsRoutes = require("./modules/jobs/jobs.routes");
 const candidateJobsRoutes = require("./modules/candidate/candidateJobs.routes");
 const applicantsRoutes = require("./modules/applicants/applicants.routes");
-
+const candidateProfileRoutes = require("./modules/candidate/candidateProfile.routes");
 
 
 
@@ -24,6 +24,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/candidate", candidateJobsRoutes);
 app.use("/api/applicants", applicantsRoutes);
+app.use("/api/candidate", candidateProfileRoutes);
 
 /* Swagger Documentation */
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));

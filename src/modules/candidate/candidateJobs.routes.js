@@ -114,12 +114,14 @@ router.post(
 );
 
 
+
+
 /**
  * @swagger
  * /api/candidate/jobs/{jobId}/apply:
  *   post:
- *     summary: Submit job application
- *     description: Allows a candidate to apply for a job by submitting personal, education, work experience, and additional details along with resume upload.
+ *     summary: Apply for a job
+ *     description: Candidate applies for a job with auto-filled data from profile. Allows override and resume upload.
  *     tags: [Candidate Jobs]
  *     security:
  *       - bearerAuth: []
@@ -127,43 +129,30 @@ router.post(
  *       - in: path
  *         name: jobId
  *         required: true
- *         description: ID of the job to apply for
+ *         description: Job ID to apply
  *         schema:
- *           type: integer
- *           example: 5
+ *           type: string
+ *           example: #JOB-2026-001
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required:
- *               - firstName
- *               - lastName
- *               - email
- *               - phone
- *               - qualification
- *               - degree
- *               - university
- *               - graduationYear
- *               - totalExperience
- *               - skills
- *               - resume
  *             properties:
  *               firstName:
  *                 type: string
  *               lastName:
  *                 type: string
- *               dob:
- *                 type: string
- *                 format: date
-
- *               gender:
- *                 type: string
  *               email:
  *                 type: string
  *               phone:
  *                 type: string
+ *               gender:
+ *                 type: string
+ *               dob:
+ *                 type: string
+ *                 format: date
  *               address:
  *                 type: string
  *               city:
@@ -190,41 +179,32 @@ router.post(
  *                 type: string
  *               previousCompanies:
  *                 type: string
- *               achievements:
- *                 type: string
  *               skills:
  *                 type: string
+ *                 example: NodeJS, React
  *               certifications:
  *                 type: string
+ *                 example: AWS, Azure
  *               languages:
  *                 type: string
+ *                 example: English, Hindi
  *               resume:
  *                 type: string
  *                 format: binary
- *                 description: Upload candidate resume
+ *                 description: Upload resume (optional)
  *     responses:
  *       200:
  *         description: Application submitted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Application submitted successfully
- *                 applicationId:
- *                   type: integer
- *                   example: 12
  *       400:
- *         description: Candidate has already applied for this job
+ *         description: Already applied or invalid data
  *       401:
- *         description: Unauthorized - Invalid or missing token
+ *         description: Unauthorized
  *       404:
  *         description: Job not found
  *       500:
  *         description: Internal server error
  */
+
 router.post(
   "/jobs/:jobId/apply",
   authMiddleware,
@@ -283,6 +263,27 @@ router.delete(
   authMiddleware,
   roleMiddleware(["CANDIDATE"]),
   candidateJobsController.removeSavedJob
+);
+
+/**
+ * @swagger
+ * /api/candidate/applications:
+ *   get:
+ *     summary: Get applied jobs with count
+ *     description: Returns total number of jobs applied and job details
+ *     tags: [Candidate Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Applications fetched successfully
+ */
+
+router.get(
+  "/applications",
+  authMiddleware,
+  roleMiddleware(["CANDIDATE"]),
+  candidateJobsController.getMyApplications
 );
 
 module.exports = router;
