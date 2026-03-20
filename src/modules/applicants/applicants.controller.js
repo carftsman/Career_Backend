@@ -3,23 +3,13 @@ const prisma = require("../../prisma");
 const applicantsService = require("./applicants.service");
 
 exports.getApplicants = async (req, res) => {
-
   try {
-
-    const applicants = await applicantsService.getApplicants();
-
-    res.json({ applicants });
-
+    const result = await applicantsService.getApplicants(req.query);
+    res.json(result);
   } catch (error) {
-
     console.error(error);
-
-    res.status(500).json({
-      message: "Internal server error"
-    });
-
+    res.status(500).json({ message: "Internal server error" });
   }
-
 };
 
 exports.exportAllApplicants = async (req, res) => {
@@ -105,12 +95,12 @@ exports.getMonthlyReport = async (req, res) => {
 
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
-    startOfMonth.setHours(0,0,0,0);
+    startOfMonth.setHours(0, 0, 0, 0);
 
     const endOfMonth = new Date();
     endOfMonth.setMonth(endOfMonth.getMonth() + 1);
     endOfMonth.setDate(0);
-    endOfMonth.setHours(23,59,59,999);
+    endOfMonth.setHours(23, 59, 59, 999);
 
     const applications = await prisma.application.findMany({
       where: {
@@ -162,7 +152,7 @@ exports.getMonthlyReport = async (req, res) => {
     });
 
     res.json({
-      month: startOfMonth.toLocaleString("default",{month:"long"}),
+      month: startOfMonth.toLocaleString("default", { month: "long" }),
       totalApplicants,
       applicationsPerJob: jobStats,
       topSkills: skillsCount
@@ -269,5 +259,98 @@ exports.getResume = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: "Error fetching resume" });
+  }
+};
+
+
+
+
+exports.getApplicantsByJob = async (req, res) => {
+  try {
+    const jobParam = req.params.jobId;
+
+    let job;
+
+    //  Support both ID & JOB-XXXX
+    if (!isNaN(jobParam)) {
+      job = await prisma.job.findUnique({
+        where: { id: Number(jobParam) }
+      });
+    }
+
+    if (!job) {
+      job = await prisma.job.findUnique({
+        where: { jobId: jobParam }
+      });
+    }
+
+    if (!job) {
+      return res.status(404).json({
+        message: "Job not found"
+      });
+    }
+
+    const applications = await prisma.application.findMany({
+      where: { jobId: job.id },
+      include: { candidate: true },
+      orderBy: { createdAt: "desc" }
+    });
+
+    // FORMAT EXACTLY FOR YOUR UI
+    const formatted = applications.map(app => ({
+      applicationId: app.id,
+
+      //  Candidate Name
+      candidateName: `${app.firstName} ${app.lastName}`,
+
+      //  Contact Info (combined)
+      contactInfo: {
+        email: app.email,
+        phone: app.phone
+      },
+
+      //  Job
+      appliedFor: job.title,
+
+      //  Experience
+      experience: app.totalExperience
+        ? `${app.totalExperience} yrs`
+        : "N/A",
+
+      //  Skills (array for tags UI)
+      skills: app.skills
+        ? app.skills.split(",").map(s => s.trim())
+        : [],
+
+      //  Location (fallback handling)
+      // location:
+      //   app.city || app.state || app.country || app.candidate?.location || "N/A",
+      location:
+        [app.city, app.state, app.country]
+          .filter(Boolean)
+          .join(", ") ||
+        app.candidate?.location ||
+        "N/A",
+
+      //  Resume
+      resumeUrl: app.resumeUrl,
+
+      //  Date
+      appliedDate: app.createdAt
+    }));
+
+    res.json({
+      jobId: job.jobId || `JOB-${job.id}`,
+      jobTitle: job.title,
+      totalApplicants: formatted.length,
+      applicants: formatted
+    });
+
+  } catch (error) {
+    console.error("GET APPLICANTS ERROR:", error);
+
+    res.status(500).json({
+      message: "Internal server error"
+    });
   }
 };

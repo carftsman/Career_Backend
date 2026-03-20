@@ -356,4 +356,37 @@ router.get(
   "/candidates/:id/resume",
   applicantsController.getResume
 );
+
+/**
+ * @swagger
+ * /api/applicants/job/{jobId}:
+ *   get:
+ *     summary: Get applicants by job
+ *     description: Returns all candidates who applied for a specific job
+ *     tags: [Applicants]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: JOB-2026-001
+ *     responses:
+ *       200:
+ *         description: Applicants fetched successfully
+ *       404:
+ *         description: Job not found
+ */
+
+router.get(
+  "/job/:jobId",
+  authMiddleware,
+  roleMiddleware(["HR", "MANAGER"]),
+  applicantsController.getApplicantsByJob
+);
+
+
+
 module.exports = router;
