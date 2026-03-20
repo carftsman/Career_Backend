@@ -90,84 +90,136 @@ exports.exportSelectedApplicants = async (req, res) => {
 };
 
 exports.getMonthlyReport = async (req, res) => {
-
   try {
+    let {
+      month,
+      year,
+      search,
+      jobTitle,
+      experience,
+      location,
+      page = 1,
+      limit = 10
+    } = req.query;
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    const now = new Date();
 
-    const endOfMonth = new Date();
-    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-    endOfMonth.setDate(0);
-    endOfMonth.setHours(23, 59, 59, 999);
+    //  Default month/year
+    month = month ? Number(month) : now.getMonth() + 1;
+    year = year ? Number(year) : now.getFullYear();
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    //  BASE WHERE
+    let where = {
+      createdAt: {
+        gte: startDate,
+        lt: endDate
+      }
+    };
+
+    //  SEARCH (name/email/skills)
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { skills: { contains: search, mode: "insensitive" } }
+      ];
+    }
+
+    //  EXPERIENCE FILTER
+    if (experience) {
+      where.totalExperience = {
+        gte: Number(experience)
+      };
+    }
+
+    //  LOCATION FILTER
+    if (location && location !== "Global") {
+      where.OR = [
+        ...(where.OR || []),
+        { city: { contains: location, mode: "insensitive" } },
+        { state: { contains: location, mode: "insensitive" } },
+        { country: { contains: location, mode: "insensitive" } }
+      ];
+    }
 
     const applications = await prisma.application.findMany({
+      where,
+      include: {
+        job: true
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * Number(limit),
+      take: Number(limit)
+    });
+
+    //  FILTER BY JOB TITLE (after include)
+    let filtered = applications;
+
+    if (jobTitle && jobTitle !== "All Jobs") {
+      filtered = applications.filter(app =>
+        app.job?.title?.toLowerCase().includes(jobTitle.toLowerCase())
+      );
+    }
+
+    //  FORMAT (UI EXACT)
+    const formatted = filtered.map(app => ({
+      applicationId: app.id,
+
+      name: `${app.firstName} ${app.lastName}`,
+
+      contactInfo: {
+        email: app.email,
+        phone: app.phone
+      },
+
+      exp: app.totalExperience
+        ? `${app.totalExperience} years`
+        : "N/A",
+
+      skills: app.skills
+        ? app.skills.split(",").map(s => s.trim())
+        : [],
+
+      location:
+        [app.city, app.state, app.country]
+          .filter(Boolean)
+          .join(", ") || app.candidate?.location || "N/A",
+
+      resume: app.resumeUrl,
+
+      appliedDate: app.createdAt
+    }));
+
+    //  TOTAL COUNT (for UI top card)
+    const totalApplicants = await prisma.application.count({
       where: {
         createdAt: {
-          gte: startOfMonth,
-          lte: endOfMonth
+          gte: startDate,
+          lt: endDate
         }
-      },
-      include: {
-        job: true,
-        candidate: true
       }
-    });
-
-    const totalApplicants = applications.length;
-
-    const jobStats = {};
-
-    applications.forEach(app => {
-
-      const title = app.job.title;
-
-      if (!jobStats[title]) {
-        jobStats[title] = 0;
-      }
-
-      jobStats[title]++;
-
-    });
-
-    const skillsCount = {};
-
-    applications.forEach(app => {
-
-      const skills = app.candidate.skills?.split(",") || [];
-
-      skills.forEach(skill => {
-
-        const s = skill.trim();
-
-        if (!skillsCount[s]) {
-          skillsCount[s] = 0;
-        }
-
-        skillsCount[s]++;
-
-      });
-
     });
 
     res.json({
-      month: startOfMonth.toLocaleString("default", { month: "long" }),
-      totalApplicants,
-      applicationsPerJob: jobStats,
-      topSkills: skillsCount
+      month,
+      year,
+      totalApplicants, 
+      results: formatted.length,
+      page: Number(page),
+      applicants: formatted
     });
 
   } catch (error) {
-
-    console.error(error);
+    console.error("MONTHLY REPORT ERROR:", error);
 
     res.status(500).json({
-      message: "Failed to generate report"
+      message: "Internal server error"
     });
-
   }
-
 };
 
 exports.getCandidates = async (req, res) => {
@@ -322,9 +374,7 @@ exports.getApplicantsByJob = async (req, res) => {
         ? app.skills.split(",").map(s => s.trim())
         : [],
 
-      //  Location (fallback handling)
-      // location:
-      //   app.city || app.state || app.country || app.candidate?.location || "N/A",
+
       location:
         [app.city, app.state, app.country]
           .filter(Boolean)

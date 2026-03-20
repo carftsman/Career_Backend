@@ -2,6 +2,19 @@ const prisma = require("../../prisma");
 
 exports.getJobs = async (status, search) => {
 
+  const now = new Date();
+
+  //  STEP 1: AUTO CLOSE EXPIRED JOBS
+  await prisma.job.updateMany({
+    where: {
+      deadline: { lt: now },
+      status: "ACTIVE"
+    },
+    data: {
+      status: "CLOSED"
+    }
+  });
+
   const where = {
     ...(status && { status }),
 
@@ -9,11 +22,7 @@ exports.getJobs = async (status, search) => {
       OR: [
         { title: { contains: search, mode: "insensitive" } },
         { department: { contains: search, mode: "insensitive" } },
-
-        //  if skills is ARRAY
         { skills: { hasSome: [search] } },
-
-        //  fallback if skills is string (keep if needed)
         { description: { contains: search, mode: "insensitive" } }
       ]
     })
@@ -29,54 +38,32 @@ exports.getJobs = async (status, search) => {
     }
   });
 
-  const now = new Date();
-
   return jobs.map(job => {
 
-    let finalStatus = job.status;
-
-    //  Handle deadline passed
-    if (job.deadline && new Date(job.deadline) < now && job.status === "ACTIVE") {
-      finalStatus = "DEADLINE_PASSED";
-    }
+    const isExpired = job.deadline && new Date(job.deadline) < now;
 
     return {
       id: job.id,
 
-      // Job ID for UI
       jobId: job.jobId ? `#${job.jobId}` : `#JOB-${job.id}`,
 
       title: job.title,
-
       department: job.department,
-
       location: job.location,
-
       experience: job.experience,
-
       jobType: job.jobType,
 
-      status: finalStatus,
+      //  System status (for tabs)
+      status: job.status,
+
+      //  UI status (for badge)
+      displayStatus: isExpired ? "DEADLINE_PASSED" : job.status,
 
       applicants: job._count.applications,
-
-      postedDate: job.createdAt
+      postedDate: job.createdAt,
+      deadline: job.deadline
     };
   });
-};
-
-
-exports.getJobById = async (jobId) => {
-
-  return prisma.job.findUnique({
-    where: { id: jobId },
-    include: {
-      _count: {
-        select: { applications: true }
-      }
-    }
-  });
-
 };
 
 

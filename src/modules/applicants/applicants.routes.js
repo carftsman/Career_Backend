@@ -197,16 +197,140 @@ router.post(
  * @swagger
  * /api/applicants/monthly-report:
  *   get:
- *     summary: Generate monthly applicants report
- *     description: Returns analytics of applicants for the current month.
+ *     summary: Get monthly applicants report with filters
+ *     description: Returns applicants for a selected month with search, job, experience, location filters and pagination.
  *     tags: [Applicants]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: integer
+ *           example: 3
+ *         required: false
+ *         description: Month (1-12). Default = current month
+ *
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *           example: 2026
+ *         required: false
+ *         description: Year. Default = current year
+ *
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: sushma
+ *         required: false
+ *         description: Search by name, email or skills
+ *
+ *       - in: query
+ *         name: jobTitle
+ *         schema:
+ *           type: string
+ *           example: Backend Developer
+ *         required: false
+ *         description: Filter by job title (use "All Jobs" for no filter)
+ *
+ *       - in: query
+ *         name: experience
+ *         schema:
+ *           type: integer
+ *           example: 2
+ *         required: false
+ *         description: Minimum years of experience
+ *
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *           example: Hyderabad
+ *         required: false
+ *         description: Filter by location (city/state/country or "Global")
+ *
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         required: false
+ *         description: Page number (default = 1)
+ *
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *         required: false
+ *         description: Number of records per page (default = 10)
+ *
  *     responses:
  *       200:
  *         description: Monthly report generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 month:
+ *                   type: integer
+ *                   example: 3
+ *                 year:
+ *                   type: integer
+ *                   example: 2026
+ *                 totalApplicants:
+ *                   type: integer
+ *                   example: 342
+ *                 results:
+ *                   type: integer
+ *                   example: 10
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 applicants:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       applicationId:
+ *                         type: integer
+ *                         example: 1
+ *                       name:
+ *                         type: string
+ *                         example: Sushma Sree
+ *                       contactInfo:
+ *                         type: object
+ *                         properties:
+ *                           email:
+ *                             type: string
+ *                             example: sushma@gmail.com
+ *                           phone:
+ *                             type: string
+ *                             example: 9876543210
+ *                       exp:
+ *                         type: string
+ *                         example: 2 years
+ *                       skills:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["NodeJS", "React"]
+ *                       location:
+ *                         type: string
+ *                         example: Hyderabad
+ *                       resume:
+ *                         type: string
+ *                         example: https://example.com/resume.pdf
+ *                       appliedDate:
+ *                         type: string
+ *                         format: date-time
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       500:
  *         description: Internal server error
  */
@@ -372,7 +496,7 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *         example: JOB-2026-001
+ *         example: JOB-2026-1
  *     responses:
  *       200:
  *         description: Applicants fetched successfully
