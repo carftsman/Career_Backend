@@ -105,9 +105,9 @@ model Application {
   resumeUrl String?
 
   // Additional info
-  skills String?
-  certifications String?
-  languages String?
+  skills String[]
+  certifications String[]
+  languages String[]
 
   status ApplicationStatus @default(APPLIED)
 
