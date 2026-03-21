@@ -99,7 +99,7 @@ exports.getJobById = async (jobParam) => {
 
   let job;
 
-  // ✅ Support both id & JOB-XXXX
+  // Support both id & JOB-XXXX
   if (!isNaN(jobParam)) {
     job = await prisma.job.findUnique({
       where: { id: Number(jobParam) },

@@ -485,11 +485,12 @@ router.get(
  * @swagger
  * /api/applicants/job/{jobId}:
  *   get:
- *     summary: Get applicants by job
- *     description: Returns all candidates who applied for a specific job
+ *     summary: Get applicants by job with filters
+ *     description: Returns applicants for a specific job with search, skills, experience, location, month, year filters and pagination.
  *     tags: [Applicants]
  *     security:
  *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: jobId
@@ -497,11 +498,135 @@ router.get(
  *         schema:
  *           type: string
  *         example: JOB-2026-1
+ *
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         example: sushma
+ *         description: Search by name or email
+ *
+ *       - in: query
+ *         name: skills
+ *         schema:
+ *           type: string
+ *         example: NodeJS
+ *         description: Filter by skill
+ *
+ *       - in: query
+ *         name: experience
+ *         schema:
+ *           type: integer
+ *         example: 2
+ *         description:  experience
+ *
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         example: Hyderabad
+ *         description: Filter by city/state/country
+ *
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: integer
+ *           example: 3
+ *         description: Month (1-12)
+ *
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *           example: 2026
+ *         description: Year
+ *
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Page number (default = 1)
+ *
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *         description: Records per page (default = 10)
+ *
  *     responses:
  *       200:
  *         description: Applicants fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 jobId:
+ *                   type: string
+ *                   example: JOB-2026-1
+ *                 jobTitle:
+ *                   type: string
+ *                   example: Backend Developer
+ *                 totalApplicants:
+ *                   type: integer
+ *                   example: 24
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 totalPages:
+ *                   type: integer
+ *                   example: 3
+ *                 applicants:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       applicationId:
+ *                         type: integer
+ *                         example: 1
+ *                       candidateName:
+ *                         type: string
+ *                         example: Sushma Sree
+ *                       contactInfo:
+ *                         type: object
+ *                         properties:
+ *                           email:
+ *                             type: string
+ *                             example: sushma@gmail.com
+ *                           phone:
+ *                             type: string
+ *                             example: 9876543210
+ *                       appliedFor:
+ *                         type: string
+ *                         example: Backend Developer
+ *                       exp:
+ *                         type: string
+ *                         example: 2 yrs
+ *                       skills:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["NodeJS", "React"]
+ *                       location:
+ *                         type: string
+ *                         example: Hyderabad
+ *                       resume:
+ *                         type: string
+ *                         example: https://example.com/resume.pdf
+ *                       appliedDate:
+ *                         type: string
+ *                         format: date-time
+ *
+ *       401:
+ *         description: Unauthorized
+ *
  *       404:
  *         description: Job not found
+ *
+ *       500:
+ *         description: Internal server error
  */
 
 router.get(
@@ -510,7 +635,5 @@ router.get(
   roleMiddleware(["HR", "MANAGER"]),
   applicantsController.getApplicantsByJob
 );
-
-
 
 module.exports = router;

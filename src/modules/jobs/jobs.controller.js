@@ -24,27 +24,38 @@ exports.getJobs = async (req, res) => {
 
 
 exports.getJobById = async (req, res) => {
-
   try {
+    const jobParam = req.params.jobId;
 
-    const jobId = Number(req.params.jobId);
-
-    const job = await jobsService.getJobById(jobId);
+    const job = await jobsService.getJobById(jobParam);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({
+        message: "Job not found"
+      });
     }
 
-    res.json(job);
+    const now = new Date();
+
+    const isExpired =
+      job.deadline && new Date(job.deadline) < now;
+
+    //  return same object + displayStatus
+    res.json({
+      ...job, //  keep everything same
+
+      displayStatus: isExpired
+        ? "DEADLINE_PASSED"
+        : job.status
+    });
 
   } catch (error) {
-
     console.error(error);
 
-    res.status(500).json({ message: "Internal server error" });
-
+    res.status(500).json({
+      message: "Internal server error"
+    });
   }
-
 };
 
 

@@ -138,39 +138,3 @@ exports.getApplicants = async (filters) => {
     totalPages: Math.ceil(total / limit)
   };
 };
-
-// exports.getApplicantsByJob = async (jobCode) => {
-
-//   const job = await prisma.job.findUnique({
-//     where: { jobId: jobCode }
-//   });
-
-//   if (!job) {
-//     throw new Error("Job not found");
-//   }
-
-//   const applications = await prisma.application.findMany({
-//     where: {
-//       jobId: job.id   // FK (numeric)
-//     },
-//     include: {
-//       candidate: true,
-//       job: true
-//     }
-//   });
-
-//   return applications.map(a => ({
-//     id: a.id,
-//     name: `${a.firstName} ${a.lastName}`,
-//     email: a.email,
-//     phone: a.phone,
-//     jobTitle: a.job.title,
-//     jobCode: a.job.jobId,
-//     experience: a.totalExperience,
-//     skills: a.skills,
-//     location: `${a.city || ""} ${a.country || ""}`,
-//     resume: a.resumeUrl,
-//     status: a.status,
-//     appliedDate: a.createdAt
-//   }));
-// };
