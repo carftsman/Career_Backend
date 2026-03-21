@@ -94,3 +94,31 @@ exports.reopenJob = async (jobId) => {
   });
 
 };
+
+exports.getJobById = async (jobParam) => {
+
+  let job;
+
+  // ✅ Support both id & JOB-XXXX
+  if (!isNaN(jobParam)) {
+    job = await prisma.job.findUnique({
+      where: { id: Number(jobParam) },
+      include: {
+        _count: {
+          select: { applications: true }
+        }
+      }
+    });
+  } else {
+    job = await prisma.job.findUnique({
+      where: { jobId: jobParam },
+      include: {
+        _count: {
+          select: { applications: true }
+        }
+      }
+    });
+  }
+
+  return job;
+};
