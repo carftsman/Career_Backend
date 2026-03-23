@@ -131,43 +131,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// exports.getProfile = async (req, res) => {
-
-//   try {
-
-//     const candidateId = req.user.id;
-
-//     const candidate = await prisma.candidate.findUnique({
-//       where: { id: candidateId }
-//     });
-
-//     if (!candidate) {
-//       return res.status(404).json({
-//         message: "Candidate not found"
-//       });
-//     }
-
-//     res.json({
-//       firstName: candidate.firstName,
-//       lastName: candidate.lastName,
-//       email: candidate.email,
-//       phone: candidate.phone,
-//       location: candidate.location,
-//       skills: candidate.skills,
-//       resumeUrl: candidate.resumeUrl
-//     });
-
-//   } catch (error) {
-
-//     console.error(error);
-
-//     res.status(500).json({
-//       message: "Failed to fetch profile"
-//     });
-
-//   }
-
-// };
 
 exports.getProfile = async (req, res) => {
   try {

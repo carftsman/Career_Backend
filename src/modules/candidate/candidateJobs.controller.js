@@ -120,174 +120,6 @@ exports.saveJob = async (req, res) => {
 };
 
 
-
-// exports.applyJob = async (req, res) => {
-//   try {
-//     const candidateId = req.user.id;
-//     const jobParam = req.params.jobId;
-
-//     let job;
-
-//     //  Handle both numeric ID and JOB-XXXX
-//     if (!isNaN(jobParam)) {
-//       job = await prisma.job.findUnique({
-//         where: { id: Number(jobParam) }
-//       });
-//     } else {
-//       job = await prisma.job.findUnique({
-//         where: { jobId: jobParam }
-//       });
-//     }
-
-//     //  Job not found
-//     if (!job) {
-//       return res.status(404).json({
-//         message: "Job not found"
-//       });
-//     }
-
-//     // Prevent applying to CLOSED job
-//     if (job.status === "CLOSED") {
-//       return res.status(400).json({
-//         message: "This job is closed"
-//       });
-//     }
-
-//     //  Prevent applying after deadline
-//     if (job.deadline && new Date(job.deadline) < new Date()) {
-//       return res.status(400).json({
-//         message: "Application deadline has passed"
-//       });
-//     }
-
-//     //  Use DB id
-//     const jobId = job.id;
-
-//     //  Prevent duplicate application
-//     const existingApplication = await prisma.application.findFirst({
-//       where: { candidateId, jobId }
-//     });
-
-//     if (existingApplication) {
-//       return res.status(400).json({
-//         message: "You already applied for this job"
-//       });
-//     }
-
-//     //  Fetch candidate + profile
-//     const candidate = await prisma.candidate.findUnique({
-//       where: { id: candidateId },
-//       include: { profile: true }
-//     });
-
-//     if (!candidate) {
-//       return res.status(404).json({
-//         message: "Candidate not found"
-//       });
-//     }
-
-//     const profile = candidate.profile || {};
-//     const body = req.body;
-//     const file = req.file;
-
-//     //  Resume upload
-//     let resumeUrl = candidate.resumeUrl || null;
-
-//     if (file) {
-//       const fileName = `resume-${candidateId}-${Date.now()}-${file.originalname}`;
-//       resumeUrl = await uploadToAzure(file.buffer, fileName);
-//     }
-
-//     //  Helper
-//     const toArray = (field) => {
-//       if (!field) return [];
-//       return Array.isArray(field)
-//         ? field
-//         : field.split(",").map(s => s.trim());
-//     };
-
-//     //  FINAL DATA (AUTO-FILL + OVERRIDE)
-//     const applicationData = {
-//       candidateId,
-//       jobId,
-
-//       //  PERSONAL
-//       firstName: body.firstName || candidate.firstName,
-//       lastName: body.lastName || candidate.lastName,
-//       email: body.email || candidate.email,
-//       phone: body.phone || candidate.phone,
-
-//       gender: body.gender || profile.gender || null,
-//       dob: body.dob
-//         ? new Date(body.dob)
-//         : profile.dob || null,
-
-//       //  ADDRESS
-//       address: body.address || profile.address || null,
-//       city: body.city || profile.city || null,
-//       state: body.state || profile.state || null,
-//       country: body.country || profile.country || null,
-
-//       //  EDUCATION
-//       qualification: body.qualification || profile.qualification || null,
-//       degree: body.degree || profile.degree || null,
-//       university: body.university || profile.university || null,
-//       graduationYear: body.graduationYear
-//         ? Number(body.graduationYear)
-//         : profile.graduationYear || null,
-//       cgpa: body.cgpa
-//         ? Number(body.cgpa)
-//         : profile.cgpa || null,
-
-//       //  EXPERIENCE
-//       totalExperience: body.totalExperience
-//         ? Number(body.totalExperience)
-//         : profile.totalExperience || null,
-//       currentCompany: body.currentCompany || profile.currentCompany || null,
-//       currentRole: body.currentRole || profile.currentRole || null,
-//       previousCompanies:
-//         body.previousCompanies || profile.previousCompanies || null,
-
-//       //  SKILLS
-//       skills: body.skills
-//         ? toArray(body.skills)
-//         : profile.skills || [],
-
-//       //  CERTIFICATES (fixed)
-//       certifications: body.certifications
-//         ? toArray(body.certifications)
-//         : profile.certificateUrls || [],
-
-//       //  LANGUAGES
-//       languages: body.languages
-//         ? toArray(body.languages)
-//         : profile.languages || [],
-
-//       //  RESUME
-//       resumeUrl,
-
-//       status: "APPLIED"
-//     };
-
-//     //  CREATE APPLICATION
-//     const application = await prisma.application.create({
-//       data: applicationData
-//     });
-
-//     res.json({
-//       message: "Application submitted successfully",
-//       application
-//     });
-
-//   } catch (error) {
-//     console.error("APPLY ERROR:", error);
-
-//     res.status(500).json({
-//       message: "Failed to submit application"
-//     });
-//   }
-// };
-
 exports.applyJob = async (req, res) => {
   try {
     const candidateId = req.user.id;
@@ -295,7 +127,7 @@ exports.applyJob = async (req, res) => {
 
     let job;
 
-    //  Support both ID and JOB-XXXX
+    //  Support both numeric ID & jobCode
     if (!isNaN(jobParam)) {
       job = await prisma.job.findUnique({
         where: { id: Number(jobParam) }
@@ -306,21 +138,14 @@ exports.applyJob = async (req, res) => {
       });
     }
 
-    // Job not found
     if (!job) {
-      return res.status(404).json({
-        message: "Job not found"
-      });
+      return res.status(404).json({ message: "Job not found" });
     }
 
-    //  Prevent closed jobs
     if (job.status === "CLOSED") {
-      return res.status(400).json({
-        message: "This job is closed"
-      });
+      return res.status(400).json({ message: "This job is closed" });
     }
 
-    //  Prevent expired jobs
     if (job.deadline && new Date(job.deadline) < new Date()) {
       return res.status(400).json({
         message: "Application deadline has passed"
@@ -329,7 +154,6 @@ exports.applyJob = async (req, res) => {
 
     const jobId = job.id;
 
-    //  Prevent duplicate apply
     const existingApplication = await prisma.application.findFirst({
       where: { candidateId, jobId }
     });
@@ -340,16 +164,13 @@ exports.applyJob = async (req, res) => {
       });
     }
 
-    //  Get candidate + profile
     const candidate = await prisma.candidate.findUnique({
       where: { id: candidateId },
       include: { profile: true }
     });
 
     if (!candidate) {
-      return res.status(404).json({
-        message: "Candidate not found"
-      });
+      return res.status(404).json({ message: "Candidate not found" });
     }
 
     const profile = candidate.profile || {};
@@ -364,15 +185,34 @@ exports.applyJob = async (req, res) => {
       resumeUrl = await uploadToAzure(file.buffer, fileName);
     }
 
-    //  Helper: convert array → string
-    const toString = (field) => {
-      if (!field) return null;
-      return Array.isArray(field)
-        ? field.join(", ")
-        : field;
+    //  STRING CLEANER
+    const safeValue = (val) => {
+      return val && val !== "string" && val !== "" ? val : null;
     };
 
-    //  FINAL DATA (AUTO-FILL + OVERRIDE)
+    //  NUMBER CLEANER
+    const safeNumber = (val, fallback) => {
+      if (
+        val === undefined ||
+        val === null ||
+        val === "" ||
+        val === "string"
+      ) {
+        return fallback ?? null;
+      }
+
+      const num = Number(val);
+      return isNaN(num) ? fallback ?? null : num;
+    };
+
+    //  ARRAY PARSER
+    const parseArray = (field) => {
+      if (!field || field === "string") return [];
+      if (Array.isArray(field)) return field;
+      return field.split(",").map((s) => s.trim());
+    };
+
+    //  FINAL DATA
     const applicationData = {
       candidate: {
         connect: { id: candidateId }
@@ -381,60 +221,83 @@ exports.applyJob = async (req, res) => {
         connect: { id: jobId }
       },
 
-      // PERSONAL
-      firstName: body.firstName || candidate.firstName,
-      lastName: body.lastName || candidate.lastName,
-      email: body.email || candidate.email,
-      phone: body.phone || candidate.phone,
+      // BASIC
+      firstName: safeValue(body.firstName) ?? candidate.firstName,
+      lastName: safeValue(body.lastName) ?? candidate.lastName,
+      email: safeValue(body.email) ?? candidate.email,
+      phone: safeValue(body.phone) ?? candidate.phone,
 
-      gender: body.gender || profile.gender || null,
-      dob: body.dob ? new Date(body.dob) : profile.dob || null,
+      // PERSONAL
+      gender: safeValue(body.gender) ?? safeValue(profile.gender),
+      dob: body.dob
+        ? new Date(body.dob)
+        : profile.dob || null,
 
       // ADDRESS
-      address: body.address || profile.address || null,
-      city: body.city || profile.city || null,
-      state: body.state || profile.state || null,
-      country: body.country || profile.country || null,
+      address: safeValue(body.address) ?? safeValue(profile.address),
+      city: safeValue(body.city) ?? safeValue(profile.city),
+      state: safeValue(body.state) ?? safeValue(profile.state),
+      country: safeValue(body.country) ?? safeValue(profile.country),
 
       // EDUCATION
-      qualification: body.qualification || profile.qualification || null,
-      degree: body.degree || profile.degree || null,
-      university: body.university || profile.university || null,
-      graduationYear: body.graduationYear
-        ? Number(body.graduationYear)
-        : profile.graduationYear || null,
-      cgpa: body.cgpa
-        ? Number(body.cgpa)
-        : profile.cgpa || null,
+      qualification:
+        safeValue(body.qualification) ?? safeValue(profile.qualification),
+      degree:
+        safeValue(body.degree) ?? safeValue(profile.degree),
+      university:
+        safeValue(body.university) ?? safeValue(profile.university),
+
+      graduationYear: safeNumber(
+        body.graduationYear,
+        profile.graduationYear
+      ),
+
+      cgpa: safeNumber(body.cgpa, profile.cgpa),
 
       // EXPERIENCE
-      totalExperience: body.totalExperience
-        ? Number(body.totalExperience)
-        : profile.totalExperience || null,
-      currentCompany: body.currentCompany || profile.currentCompany || null,
-      currentRole: body.currentRole || profile.currentRole || null,
+      totalExperience: safeNumber(
+        body.totalExperience,
+        profile.totalExperience
+      ),
+
+      currentCompany:
+        safeValue(body.currentCompany) ??
+        safeValue(profile.currentCompany),
+
+      currentRole:
+        safeValue(body.currentRole) ??
+        safeValue(profile.currentRole),
+
       previousCompanies:
-        body.previousCompanies || profile.previousCompanies || null,
+        safeValue(body.previousCompanies) ??
+        safeValue(profile.previousCompanies),
 
-      achievements: body.achievements || null,
+      achievements: safeValue(body.achievements),
 
-      // ✅ ARRAY FIELDS (DIRECT)
-      skills: body.skills || profile.skills || [],
-      certifications: body.certifications || [],
-      languages: body.languages || profile.languages || [],
+      // ARRAYS
+      skills: body.skills
+        ? parseArray(body.skills)
+        : profile.skills ?? [],
 
-      // RESUME
+      certifications: body.certifications
+        ? parseArray(body.certifications)
+        : [],
+
+      languages: body.languages
+        ? parseArray(body.languages)
+        : profile.languages ?? [],
+
+      // FILE
       resumeUrl,
 
       status: "APPLIED"
     };
 
-    //  CREATE APPLICATION
     const application = await prisma.application.create({
       data: applicationData
     });
 
-    res.json({
+    res.status(200).json({
       message: "Application submitted successfully",
       application
     });
@@ -443,7 +306,8 @@ exports.applyJob = async (req, res) => {
     console.error("APPLY ERROR:", error);
 
     res.status(500).json({
-      message: "Failed to submit application"
+      message: "Failed to submit application",
+      error: error.message
     });
   }
 };

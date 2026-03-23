@@ -121,18 +121,20 @@ router.post(
  * /api/candidate/jobs/{jobId}/apply:
  *   post:
  *     summary: Apply for a job
- *     description: Candidate applies for a job with auto-filled data from profile. Allows override and resume upload.
+ *     description: Candidate applies for a job. If fields are empty, data is auto-filled from profile.
  *     tags: [Candidate Jobs]
  *     security:
  *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: jobId
  *         required: true
- *         description: Job ID to apply
+ *         description: Job ID or Job Code
  *         schema:
  *           type: string
- *           example: #JOB-2026-001
+ *           example: "24"
+ *
  *     requestBody:
  *       required: false
  *       content:
@@ -140,58 +142,126 @@ router.post(
  *           schema:
  *             type: object
  *             properties:
+ *
  *               firstName:
  *                 type: string
+ *                 nullable: true
+ *                 example: Sushma
+ *
  *               lastName:
  *                 type: string
+ *                 nullable: true
+ *                 example: Sree
+ *
  *               email:
  *                 type: string
+ *                 nullable: true
+ *                 example: sushma@gmail.com
+ *
  *               phone:
  *                 type: string
+ *                 nullable: true
+ *                 example: "9876543210"
+ *
  *               gender:
  *                 type: string
+ *                 nullable: true
+ *                 example: Female
+ *
  *               dob:
  *                 type: string
  *                 format: date
+ *                 nullable: true
+ *                 example: "2000-02-09"
+ *
  *               address:
  *                 type: string
+ *                 nullable: true
+ *                 example: Hyderabad
+ *
  *               city:
  *                 type: string
+ *                 nullable: true
+ *                 example: Hyderabad
+ *
  *               state:
  *                 type: string
+ *                 nullable: true
+ *                 example: Telangana
+ *
  *               country:
  *                 type: string
+ *                 nullable: true
+ *                 example: India
+ *
  *               qualification:
  *                 type: string
+ *                 nullable: true
+ *                 example: B.Tech
+ *
  *               degree:
  *                 type: string
+ *                 nullable: true
+ *                 example: Computer Science
+ *
  *               university:
  *                 type: string
+ *                 nullable: true
+ *                 example: JNTU
+ *
  *               graduationYear:
  *                 type: integer
+ *                 nullable: true
+ *                 example: 2022
+ *
  *               cgpa:
  *                 type: number
+ *                 nullable: true
+ *                 example: 8.5
+ *
  *               totalExperience:
  *                 type: integer
+ *                 nullable: true
+ *                 example: 2
+ *
  *               currentCompany:
  *                 type: string
+ *                 nullable: true
+ *                 example: Cognizant
+ *
  *               currentRole:
  *                 type: string
+ *                 nullable: true
+ *                 example: Developer
+ *
  *               previousCompanies:
  *                 type: string
+ *                 nullable: true
+ *                 example: TCS
+ *
  *               skills:
- *                 type: string
- *                 example: NodeJS, React
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["NodeJS", "React"]
+ *
  *               certifications:
- *                 type: string
- *                 example: AWS, Azure
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["AWS", "Azure"]
+ *
  *               languages:
- *                 type: string
- *                 example: English, Hindi
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["English", "Hindi"]
+ *
  *               resume:
  *                 type: string
  *                 format: binary
  *                 description: Upload resume (optional)
+ *
  *     responses:
  *       200:
  *         description: Application submitted successfully
