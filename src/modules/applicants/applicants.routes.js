@@ -10,7 +10,7 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  * /api/applicants:
  *   get:
  *     summary: Get all applicants
- *     description: Returns a list of candidates who applied for jobs. Supports filtering by search, skills, experience, job title, location, month, and year.
+ *     description: Returns a list of candidates who applied for jobs with filters.
  *     tags: [Applicants]
  *     security:
  *       - bearerAuth: []
@@ -19,51 +19,58 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  *         name: search
  *         schema:
  *           type: string
- *         required: false
- *         description: Search by candidate name or email
  *         example: john
+ *
  *       - in: query
  *         name: skills
  *         schema:
  *           type: string
- *         required: false
- *         description: Filter by skill
  *         example: NodeJS
+ *
  *       - in: query
  *         name: experience
  *         schema:
- *           type: integer
- *         required: false
- *         description: Filter by years of experience
- *         example: 3
+ *           type: string
+ *         description: Supports single or range (e.g., 3 or 2-5)
+ *         example: 2-5
+ *
  *       - in: query
  *         name: jobTitle
  *         schema:
  *           type: string
- *         required: false
- *         description: Filter by job title
  *         example: Backend Developer
+ *
  *       - in: query
  *         name: location
  *         schema:
  *           type: string
- *         required: false
- *         description: Filter by candidate location
  *         example: Hyderabad
+ *
  *       - in: query
  *         name: month
  *         schema:
- *           type: integer
- *         required: false
- *         description: Filter by application month
- *         example: 3
+ *           type: string
+ *         description: Accepts 1-12, jan-dec, january-december
+ *         example: jan
+ *
  *       - in: query
  *         name: year
  *         schema:
  *           type: integer
- *         required: false
- *         description: Filter by application year
  *         example: 2026
+ *
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         example: 10
+ *
  *     responses:
  *       200:
  *         description: Applicants fetched successfully
@@ -72,42 +79,44 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  *             schema:
  *               type: object
  *               properties:
- *                 applicants:
+ *                 data:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
  *                       id:
  *                         type: integer
- *                         example: 1
  *                       name:
  *                         type: string
- *                         example: Jane Doe
  *                       email:
  *                         type: string
- *                         example: jane@example.com
  *                       phone:
  *                         type: string
- *                         example: "9876543210"
  *                       jobTitle:
  *                         type: string
- *                         example: Backend Developer
  *                       experience:
  *                         type: integer
- *                         example: 5
  *                       skills:
- *                         type: string
- *                         example: NodeJS, React
+ *                         type: array
+ *                         items:
+ *                           type: string
  *                       location:
  *                         type: string
- *                         example: Hyderabad
  *                       resume:
  *                         type: string
- *                         example: https://storage.blob/resume.pdf
  *                       appliedDate:
  *                         type: string
  *                         format: date-time
- *                         example: 2026-03-16T10:00:00Z
+ *
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *
  *       401:
  *         description: Unauthorized
  *       500:

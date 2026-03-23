@@ -314,97 +314,6 @@ exports.getResume = async (req, res) => {
   }
 };
 
-
-
-
-// exports.getApplicantsByJob = async (req, res) => {
-//   try {
-//     const jobParam = req.params.jobId;
-
-//     let job;
-
-//     //  Support both ID & JOB-XXXX
-//     if (!isNaN(jobParam)) {
-//       job = await prisma.job.findUnique({
-//         where: { id: Number(jobParam) }
-//       });
-//     }
-
-//     if (!job) {
-//       job = await prisma.job.findUnique({
-//         where: { jobId: jobParam }
-//       });
-//     }
-
-//     if (!job) {
-//       return res.status(404).json({
-//         message: "Job not found"
-//       });
-//     }
-
-//     const applications = await prisma.application.findMany({
-//       where: { jobId: job.id },
-//       include: { candidate: true },
-//       orderBy: { createdAt: "desc" }
-//     });
-
-//     // FORMAT EXACTLY FOR YOUR UI
-//     const formatted = applications.map(app => ({
-//       applicationId: app.id,
-
-//       //  Candidate Name
-//       candidateName: `${app.firstName} ${app.lastName}`,
-
-//       //  Contact Info (combined)
-//       contactInfo: {
-//         email: app.email,
-//         phone: app.phone
-//       },
-
-//       //  Job
-//       appliedFor: job.title,
-
-//       //  Experience
-//       experience: app.totalExperience
-//         ? `${app.totalExperience} yrs`
-//         : "N/A",
-
-//       //  Skills (array for tags UI)
-//       skills: app.skills
-//         ? app.skills.split(",").map(s => s.trim())
-//         : [],
-
-
-//       location:
-//         [app.city, app.state, app.country]
-//           .filter(Boolean)
-//           .join(", ") ||
-//         app.candidate?.location ||
-//         "N/A",
-
-//       //  Resume
-//       resumeUrl: app.resumeUrl,
-
-//       //  Date
-//       appliedDate: app.createdAt
-//     }));
-
-//     res.json({
-//       jobId: job.jobId || `JOB-${job.id}`,
-//       jobTitle: job.title,
-//       totalApplicants: formatted.length,
-//       applicants: formatted
-//     });
-
-//   } catch (error) {
-//     console.error("GET APPLICANTS ERROR:", error);
-
-//     res.status(500).json({
-//       message: "Internal server error"
-//     });
-//   }
-// };
-
 exports.getApplicantsByJob = async (req, res) => {
   try {
     const jobParam = req.params.jobId;
@@ -422,7 +331,7 @@ exports.getApplicantsByJob = async (req, res) => {
 
     let job;
 
-    //  Find job
+    //  Find job (ID or jobCode)
     if (!isNaN(jobParam)) {
       job = await prisma.job.findUnique({
         where: { id: Number(jobParam) }
@@ -439,73 +348,114 @@ exports.getApplicantsByJob = async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    //  DATE FILTER
-    let dateFilter = {};
-    if (month && year) {
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 1);
+    //  Month parser (same as previous API)
+    const parseMonth = (month) => {
+      if (!month) return null;
 
-      dateFilter = {
-        createdAt: {
-          gte: startDate,
-          lt: endDate
-        }
+      if (!isNaN(month)) return Number(month);
+
+      const map = {
+        jan: 1, january: 1,
+        feb: 2, february: 2,
+        mar: 3, march: 3,
+        apr: 4, april: 4,
+        may: 5,
+        jun: 6, june: 6,
+        jul: 7, july: 7,
+        aug: 8, august: 8,
+        sep: 9, september: 9,
+        oct: 10, october: 10,
+        nov: 11, november: 11,
+        dec: 12, december: 12
       };
-    }
 
-    //  WHERE CONDITION
-    let where = {
-      jobId: job.id,
-      ...dateFilter
+      return map[month.toLowerCase()] || null;
     };
 
-    //  SEARCH
+    const parsedMonth = parseMonth(month);
+
+    //  WHERE (use AND to avoid override issues)
+    const AND = [];
+
+    AND.push({ jobId: job.id });
+
+    //  Search
     if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } }
-      ];
+      AND.push({
+        OR: [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } }
+        ]
+      });
     }
 
-    //  EXPERIENCE
+    //  Experience (exact match)
     if (experience && experience !== "Any Experience") {
-      where.totalExperience = {
-        gte: Number(experience)
-      };
+      AND.push({
+        totalExperience: {
+          equals: Number(experience)
+        }
+      });
     }
 
-    //  SKILLS
+    //  Skills (ARRAY FIX)
     if (skills && skills !== "All Skills") {
-      where.skills = {
-        contains: skills,
-        mode: "insensitive"
-      };
+      AND.push({
+        skills: {
+          has: skills
+        }
+      });
     }
 
-    //  LOCATION
+    //  Location
     if (location && location !== "City or Country") {
-      where.OR = [
-        ...(where.OR || []),
-        { city: { contains: location, mode: "insensitive" } },
-        { state: { contains: location, mode: "insensitive" } },
-        { country: { contains: location, mode: "insensitive" } }
-      ];
+      AND.push({
+        OR: [
+          { city: { contains: location, mode: "insensitive" } },
+          { state: { contains: location, mode: "insensitive" } },
+          { country: { contains: location, mode: "insensitive" } }
+        ]
+      });
     }
 
-    //  FETCH DATA
-    const applications = await prisma.application.findMany({
-      where,
-      include: { candidate: true },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * Number(limit),
-      take: Number(limit)
-    });
+    //  Date filter
+    if (parsedMonth || year) {
+      const startDate = new Date(
+        year || new Date().getFullYear(),
+        parsedMonth ? parsedMonth - 1 : 0,
+        1
+      );
 
-    //  TOTAL COUNT (for pagination)
-    const total = await prisma.application.count({ where });
+      const endDate = new Date(
+        year || new Date().getFullYear(),
+        parsedMonth ? parsedMonth : 12,
+        0
+      );
 
-    //  FORMAT (UI MATCH)
+      AND.push({
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
+      });
+    }
+
+    const where = { AND };
+
+    //  Fetch data
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where,
+        include: { candidate: true },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * Number(limit),
+        take: Number(limit)
+      }),
+      prisma.application.count({ where })
+    ]);
+
+    //  FORMAT (FIXED SKILLS)
     const formatted = applications.map(app => ({
       applicationId: app.id,
 
@@ -522,9 +472,8 @@ exports.getApplicantsByJob = async (req, res) => {
         ? `${app.totalExperience} yrs`
         : "N/A",
 
-      skills: app.skills
-        ? app.skills.split(",").map(s => s.trim())
-        : [],
+      //  FIX HERE
+      skills: app.skills || [],
 
       location:
         [app.city, app.state, app.country]
@@ -553,7 +502,8 @@ exports.getApplicantsByJob = async (req, res) => {
     console.error("GET APPLICANTS ERROR:", error);
 
     res.status(500).json({
-      message: "Internal server error"
+      message: "Internal server error",
+      error: error.message //  keep this for debugging
     });
   }
 };

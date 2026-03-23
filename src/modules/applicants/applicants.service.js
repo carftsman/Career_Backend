@@ -1,11 +1,39 @@
 const prisma = require("../../prisma");
 
+//  Month parser
+const parseMonth = (month) => {
+  if (!month) return null;
+
+  if (!isNaN(month)) {
+    const num = Number(month);
+    return num >= 1 && num <= 12 ? num : null;
+  }
+
+  const monthMap = {
+    jan: 1, january: 1,
+    feb: 2, february: 2,
+    mar: 3, march: 3,
+    apr: 4, april: 4,
+    may: 5,
+    jun: 6, june: 6,
+    jul: 7, july: 7,
+    aug: 8, august: 8,
+    sep: 9, september: 9,
+    oct: 10, october: 10,
+    nov: 11, november: 11,
+    dec: 12, december: 12
+  };
+
+  return monthMap[month.toLowerCase()] || null;
+};
+
 exports.getApplicants = async (filters) => {
   const {
     search,
     skills,
     experience,
     jobCode,
+    jobTitle,
     location,
     month,
     year,
@@ -14,8 +42,9 @@ exports.getApplicants = async (filters) => {
   } = filters;
 
   const where = {};
+  const AND = [];
 
-  //  Job Code filter (#JOB-2026-015)
+  //  Job Code
   if (jobCode) {
     const job = await prisma.job.findUnique({
       where: { jobId: jobCode }
@@ -25,81 +54,109 @@ exports.getApplicants = async (filters) => {
       return { data: [], total: 0, page: Number(page), limit: Number(limit) };
     }
 
-    where.jobId = job.id;
+    AND.push({ jobId: job.id });
   }
 
-  //  Search (name/email)
+  //  Search
   if (search) {
-    where.OR = [
-      {
-        candidate: {
-          firstName: { contains: search, mode: "insensitive" }
-        }
-      },
-      {
-        candidate: {
-          lastName: { contains: search, mode: "insensitive" }
-        }
-      },
-      {
-        candidate: {
-          email: { contains: search, mode: "insensitive" }
-        }
-      }
-    ];
+    AND.push({
+      OR: [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } }
+      ]
+    });
   }
 
-  //  Skills filter
+  //  Skills FIX (partial + case-insensitive)
   if (skills && skills !== "All Skills") {
-    where.skills = {
-      contains: skills,
-      mode: "insensitive"
-    };
+    AND.push({
+      OR: [
+        {
+          skills: {
+            has: skills
+          }
+        },
+        {
+          skills: {
+            has: skills.toLowerCase()
+          }
+        },
+        {
+          skills: {
+            has: skills.toUpperCase()
+          }
+        }
+      ]
+    });
   }
 
-  //  Experience filter
+  //  Experience FIX (exact match)
   if (experience && experience !== "Any Experience") {
-    const expValue = parseInt(experience);
+    const expValue = Number(experience);
+
     if (!isNaN(expValue)) {
-      where.totalExperience = {
-        gte: expValue
-      };
+      AND.push({
+        totalExperience: {
+          equals: expValue
+        }
+      });
     }
   }
 
-  //  Location filter
-  if (location) {
-    where.OR = [
-      { city: { contains: location, mode: "insensitive" } },
-      { state: { contains: location, mode: "insensitive" } },
-      { country: { contains: location, mode: "insensitive" } }
-    ];
+  //  Job Title
+  if (jobTitle) {
+    AND.push({
+      job: {
+        title: {
+          contains: jobTitle,
+          mode: "insensitive"
+        }
+      }
+    });
   }
 
-  //  Date filter (month + year)
-  if (month || year) {
+  //  Location
+  if (location) {
+    AND.push({
+      OR: [
+        { city: { contains: location, mode: "insensitive" } },
+        { state: { contains: location, mode: "insensitive" } },
+        { country: { contains: location, mode: "insensitive" } }
+      ]
+    });
+  }
+
+  //  Month + Year
+  const parsedMonth = parseMonth(month);
+
+  if (parsedMonth || year) {
     const startDate = new Date(
       year || new Date().getFullYear(),
-      month ? month - 1 : 0,
+      parsedMonth ? parsedMonth - 1 : 0,
       1
     );
 
     const endDate = new Date(
       year || new Date().getFullYear(),
-      month ? month : 12,
+      parsedMonth ? parsedMonth : 12,
       0
     );
 
-    where.createdAt = {
-      gte: startDate,
-      lte: endDate
-    };
+    AND.push({
+      createdAt: {
+        gte: startDate,
+        lte: endDate
+      }
+    });
   }
 
-  // Pagination
+  if (AND.length > 0) {
+    where.AND = AND;
+  }
+
   const skip = (page - 1) * limit;
 
-  //  Query
   const [applications, total] = await Promise.all([
     prisma.application.findMany({
       where,
@@ -111,11 +168,9 @@ exports.getApplicants = async (filters) => {
       skip: Number(skip),
       take: Number(limit)
     }),
-
     prisma.application.count({ where })
   ]);
 
-  //  Response mapping
   const data = applications.map(a => ({
     id: a.id,
     name: `${a.firstName} ${a.lastName}`,
