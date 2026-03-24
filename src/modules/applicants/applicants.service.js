@@ -1,6 +1,6 @@
 const prisma = require("../../prisma");
 
-//  Month parser
+//  MONTH PARSER
 const parseMonth = (month) => {
   if (!month) return null;
 
@@ -27,6 +27,44 @@ const parseMonth = (month) => {
   return monthMap[month.toLowerCase()] || null;
 };
 
+//  EXPERIENCE PARSER (1, 2-5, 3+)
+const parseExperience = (experience) => {
+  if (!experience || experience === "Any Experience") return null;
+
+  if (experience.includes("+")) {
+    return { gte: Number(experience.replace("+", "")) };
+  }
+
+  if (experience.includes("-")) {
+    const [min, max] = experience.split("-").map(Number);
+    return { gte: min, lte: max };
+  }
+
+  const val = Number(experience);
+  if (!isNaN(val)) return { equals: val };
+
+  return null;
+};
+
+//  NORMALIZE SKILLS 
+const normalizeSkills = (skills) => {
+  if (!skills) return [];
+
+  // already array
+  if (Array.isArray(skills)) return skills;
+
+  // postgres string "{NodeJS,React}"
+  if (typeof skills === "string") {
+    return skills
+      .replace(/[{}]/g, "")
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 exports.getApplicants = async (filters) => {
   const {
     search,
@@ -44,7 +82,7 @@ exports.getApplicants = async (filters) => {
   const where = {};
   const AND = [];
 
-  //  Job Code
+  //  JOB CODE
   if (jobCode) {
     const job = await prisma.job.findUnique({
       where: { jobId: jobCode }
@@ -57,7 +95,7 @@ exports.getApplicants = async (filters) => {
     AND.push({ jobId: job.id });
   }
 
-  //  Search
+  //  SEARCH
   if (search) {
     AND.push({
       OR: [
@@ -68,55 +106,22 @@ exports.getApplicants = async (filters) => {
     });
   }
 
-  //  Skills FIX (partial + case-insensitive)
-  if (skills && skills !== "All Skills") {
-    AND.push({
-      OR: [
-        {
-          skills: {
-            has: skills
-          }
-        },
-        {
-          skills: {
-            has: skills.toLowerCase()
-          }
-        },
-        {
-          skills: {
-            has: skills.toUpperCase()
-          }
-        }
-      ]
-    });
+  //  EXPERIENCE
+  const expFilter = parseExperience(experience);
+  if (expFilter) {
+    AND.push({ totalExperience: expFilter });
   }
 
-  //  Experience FIX (exact match)
-  if (experience && experience !== "Any Experience") {
-    const expValue = Number(experience);
-
-    if (!isNaN(expValue)) {
-      AND.push({
-        totalExperience: {
-          equals: expValue
-        }
-      });
-    }
-  }
-
-  //  Job Title
+  //  JOB TITLE
   if (jobTitle) {
     AND.push({
       job: {
-        title: {
-          contains: jobTitle,
-          mode: "insensitive"
-        }
+        title: { contains: jobTitle, mode: "insensitive" }
       }
     });
   }
 
-  //  Location
+  //  LOCATION
   if (location) {
     AND.push({
       OR: [
@@ -127,7 +132,7 @@ exports.getApplicants = async (filters) => {
     });
   }
 
-  //  Month + Year
+  //  MONTH + YEAR
   const parsedMonth = parseMonth(month);
 
   if (parsedMonth || year) {
@@ -144,10 +149,7 @@ exports.getApplicants = async (filters) => {
     );
 
     AND.push({
-      createdAt: {
-        gte: startDate,
-        lte: endDate
-      }
+      createdAt: { gte: startDate, lte: endDate }
     });
   }
 
@@ -155,23 +157,44 @@ exports.getApplicants = async (filters) => {
     where.AND = AND;
   }
 
+  //  FETCH ALL (NO LIMIT HERE)
+  const applications = await prisma.application.findMany({
+    where,
+    include: {
+      candidate: true,
+      job: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  //  SKILL FILTER (FIXED)
+  let filteredApplications = applications;
+
+  if (skills && skills !== "All Skills") {
+    const skillFilter = skills.toLowerCase().trim();
+
+    filteredApplications = applications.filter(app => {
+      const skillArray = normalizeSkills(app.skills);
+
+      return skillArray.some(s =>
+        s.toLowerCase().includes(skillFilter)
+      );
+    });
+  }
+
+  // TOTAL AFTER FILTER
+  const total = filteredApplications.length;
+
+  // PAGINATION AFTER FILTER
   const skip = (page - 1) * limit;
 
-  const [applications, total] = await Promise.all([
-    prisma.application.findMany({
-      where,
-      include: {
-        candidate: true,
-        job: true
-      },
-      orderBy: { createdAt: "desc" },
-      skip: Number(skip),
-      take: Number(limit)
-    }),
-    prisma.application.count({ where })
-  ]);
+  const paginated = filteredApplications.slice(
+    skip,
+    skip + Number(limit)
+  );
 
-  const data = applications.map(a => ({
+  // RESPONSE
+  const data = paginated.map(a => ({
     id: a.id,
     name: `${a.firstName} ${a.lastName}`,
     email: a.email,
@@ -179,7 +202,7 @@ exports.getApplicants = async (filters) => {
     jobTitle: a.job.title,
     jobCode: a.job.jobId,
     experience: a.totalExperience,
-    skills: a.skills,
+    skills: normalizeSkills(a.skills),
     location: `${a.city || ""} ${a.country || ""}`,
     resume: a.resumeUrl,
     appliedDate: a.createdAt
