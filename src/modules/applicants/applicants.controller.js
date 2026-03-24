@@ -348,7 +348,7 @@ exports.getApplicantsByJob = async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    //  Month parser (same as previous API)
+    //  Month parser
     const parseMonth = (month) => {
       if (!month) return null;
 
@@ -374,12 +374,13 @@ exports.getApplicantsByJob = async (req, res) => {
 
     const parsedMonth = parseMonth(month);
 
-    //  WHERE (use AND to avoid override issues)
+    //  WHERE CONDITIONS
     const AND = [];
 
+    //  Always filter by job
     AND.push({ jobId: job.id });
 
-    //  Search
+    //  SEARCH
     if (search) {
       AND.push({
         OR: [
@@ -390,25 +391,47 @@ exports.getApplicantsByJob = async (req, res) => {
       });
     }
 
-    //  Experience (exact match)
+    //  EXPERIENCE FILTER (Improved)
     if (experience && experience !== "Any Experience") {
-      AND.push({
-        totalExperience: {
-          equals: Number(experience)
-        }
-      });
+      if (experience.includes("-")) {
+        // Range (e.g., "2-5")
+        const [min, max] = experience.split("-").map(Number);
+
+        AND.push({
+          totalExperience: {
+            gte: min,
+            lte: max
+          }
+        });
+      } else {
+        // Single value (e.g., "3")
+        const exp = Number(experience);
+
+        AND.push({
+          totalExperience: {
+            gte: exp
+          }
+        });
+      }
     }
 
-    //  Skills (ARRAY FIX)
+    //  SKILLS FILTER (Multiple support)
     if (skills && skills !== "All Skills") {
-      AND.push({
-        skills: {
-          has: skills
-        }
-      });
+      const skillArray = skills
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      if (skillArray.length > 0) {
+        AND.push({
+          skills: {
+            hasSome: skillArray
+          }
+        });
+      }
     }
 
-    //  Location
+    //  LOCATION
     if (location && location !== "City or Country") {
       AND.push({
         OR: [
@@ -419,7 +442,7 @@ exports.getApplicantsByJob = async (req, res) => {
       });
     }
 
-    //  Date filter
+    //  DATE FILTER
     if (parsedMonth || year) {
       const startDate = new Date(
         year || new Date().getFullYear(),
@@ -441,21 +464,21 @@ exports.getApplicantsByJob = async (req, res) => {
       });
     }
 
-    const where = { AND };
+    const where = AND.length ? { AND } : {};
 
-    //  Fetch data
+    //  FETCH DATA
     const [applications, total] = await Promise.all([
       prisma.application.findMany({
         where,
         include: { candidate: true },
         orderBy: { createdAt: "desc" },
-        skip: (page - 1) * Number(limit),
+        skip: (Number(page) - 1) * Number(limit),
         take: Number(limit)
       }),
       prisma.application.count({ where })
     ]);
 
-    //  FORMAT (FIXED SKILLS)
+    //  FORMAT RESPONSE
     const formatted = applications.map(app => ({
       applicationId: app.id,
 
@@ -468,11 +491,10 @@ exports.getApplicantsByJob = async (req, res) => {
 
       appliedFor: job.title,
 
-      exp: app.totalExperience
+      experience: app.totalExperience
         ? `${app.totalExperience} yrs`
         : "N/A",
 
-      //  FIX HERE
       skills: app.skills || [],
 
       location:
@@ -503,7 +525,7 @@ exports.getApplicantsByJob = async (req, res) => {
 
     res.status(500).json({
       message: "Internal server error",
-      error: error.message //  keep this for debugging
+      error: error.message
     });
   }
 };

@@ -45,6 +45,9 @@ exports.getJobs = async (req, res) => {
       department: job.department,
       location: job.location,
       jobType: job.jobType,
+      description: job.description,
+      responsibilities: job.responsibilities,
+      skills: job.skills,
 
       //  ADD CREATED DATE
       createdAt: job.createdAt,
