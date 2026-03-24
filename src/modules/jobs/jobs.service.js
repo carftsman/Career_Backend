@@ -1,32 +1,77 @@
 const prisma = require("../../prisma");
 
-exports.getJobs = async (status, search) => {
+exports.getJobs = async (filters) => {
+
+  const {
+    status,
+    search,
+    minExperience,
+    maxExperience,
+    minSalary,
+    maxSalary
+  } = filters;
 
   const now = new Date();
 
-  //  STEP 1: AUTO CLOSE EXPIRED JOBS
+  //  AUTO CLOSE EXPIRED JOBS
   await prisma.job.updateMany({
     where: {
       deadline: { lt: now },
       status: "ACTIVE"
     },
-    data: {
-      status: "CLOSED"
-    }
+    data: { status: "CLOSED" }
   });
 
-  const where = {
-    ...(status && { status }),
+  const where = {};
+  const AND = [];
 
-    ...(search && {
+  //  STATUS
+  if (status) {
+    AND.push({ status });
+  }
+
+  //  EXPERIENCE FILTER
+  if (minExperience || maxExperience) {
+    AND.push({
+      AND: [
+        minExperience
+          ? { minExperience: { gte: Number(minExperience) } }
+          : {},
+        maxExperience
+          ? { maxExperience: { lte: Number(maxExperience) } }
+          : {}
+      ]
+    });
+  }
+
+  //  SALARY FILTER
+  if (minSalary || maxSalary) {
+    AND.push({
+      AND: [
+        minSalary
+          ? { minSalary: { gte: Number(minSalary) } }
+          : {},
+        maxSalary
+          ? { maxSalary: { lte: Number(maxSalary) } }
+          : {}
+      ]
+    });
+  }
+
+  //  SEARCH (DB LEVEL for performance)
+  if (search) {
+    AND.push({
       OR: [
         { title: { contains: search, mode: "insensitive" } },
         { department: { contains: search, mode: "insensitive" } },
-        { skills: { hasSome: [search] } },
         { description: { contains: search, mode: "insensitive" } }
       ]
-    })
-  };
+    });
+  }
+
+  if (AND.length > 0) {
+    where.AND = AND;
+  }
 
   const jobs = await prisma.job.findMany({
     where,
@@ -38,34 +83,65 @@ exports.getJobs = async (status, search) => {
     }
   });
 
-  return jobs.map(job => {
+  //  SKILLS PARTIAL FILTER (POST PROCESS)
+  let filtered = jobs;
 
-    const isExpired = job.deadline && new Date(job.deadline) < now;
+  if (search) {
+    const s = search.toLowerCase();
+
+    filtered = jobs.filter(job =>
+      job.title.toLowerCase().includes(s) ||
+      job.department.toLowerCase().includes(s) ||
+      job.description.toLowerCase().includes(s) ||
+      job.skills.some(skill =>
+        skill.toLowerCase().includes(s)
+      )
+    );
+  }
+
+  //  RESPONSE FORMAT
+  return filtered.map(job => {
+
+    const isExpired =
+      job.deadline && new Date(job.deadline) < now;
 
     return {
       id: job.id,
 
-      jobId: job.jobId ? `#${job.jobId}` : `#JOB-${job.id}`,
+      jobId: job.jobId
+        ? `#${job.jobId}`
+        : `#JOB-${job.id}`,
 
       title: job.title,
       department: job.department,
       location: job.location,
-      experience: job.experience,
+
+      //  EXPERIENCE
+      minExperience: job.minExperience,
+      maxExperience: job.maxExperience,
+      experienceLabel: job.experienceLabel,
+
       jobType: job.jobType,
 
-      //  System status (for tabs)
+      //  STATUS
       status: job.status,
-
-      //  UI status (for badge)
-      displayStatus: isExpired ? "DEADLINE_PASSED" : job.status,
+      displayStatus: isExpired
+        ? "DEADLINE_PASSED"
+        : job.status,
 
       applicants: job._count.applications,
+
+      //  SALARY
+      salaryRange: job.salaryRange,
+      minSalary: job.minSalary,
+      maxSalary: job.maxSalary,
+      currency: job.currency,
+
       postedDate: job.createdAt,
       deadline: job.deadline
     };
   });
 };
-
 
 exports.createJob = async (data) => {
 

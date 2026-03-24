@@ -2,9 +2,7 @@ const prisma = require("../../prisma");
 const uploadToAzure = require("../../cloud/azureUpload");
 
 exports.getJobs = async (req, res) => {
-
   try {
-
     const { search, department, location, experience, jobType } = req.query;
 
     const where = {
@@ -36,23 +34,38 @@ exports.getJobs = async (req, res) => {
 
     const jobs = await prisma.job.findMany({
       where,
-      orderBy: {
-        createdAt: "desc"
-      }
+      orderBy: { createdAt: "desc" }
     });
 
-    res.json({ jobs });
+    //  FORMAT RESPONSE
+    const formattedJobs = jobs.map(job => ({
+      id: job.id,
+      jobId: job.jobId,
+      title: job.title,
+      department: job.department,
+      location: job.location,
+      jobType: job.jobType,
+
+      //  ADD CREATED DATE
+      createdAt: job.createdAt,
+
+      // OPTIONAL (better UI)
+      postedDate: job.createdAt.toISOString(),
+
+      deadline: job.deadline,
+      salary: job.salaryRange,
+      experience: job.experienceLabel
+    }));
+
+    res.json({ jobs: formattedJobs });
 
   } catch (error) {
-
     console.error(error);
 
     res.status(500).json({
       message: "Failed to fetch jobs"
     });
-
   }
-
 };
 
 exports.getJobDetails = async (req, res) => {

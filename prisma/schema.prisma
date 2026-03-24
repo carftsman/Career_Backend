@@ -31,6 +31,10 @@ model Candidate {
   resumeUrl String?
   createdAt DateTime @default(now())
 
+  // Forgot Password fields
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   applications Application[]
   savedJobs    SavedJob[]
   profile      CandidateProfile?
@@ -46,13 +50,20 @@ model Job {
   title       String
   department  String
   location    String
-  experience  Int
+
+  minExperience Int?
+  maxExperience Int?
+  experienceLabel String?
   jobType     String
 
   description String
   responsibilities String?
   skills      String[]
-
+ 
+  salaryRange String?
+  minSalary   Int?
+  maxSalary   Int?
+  currency    String?
   deadline    DateTime
   status      JobStatus @default(ACTIVE)
 

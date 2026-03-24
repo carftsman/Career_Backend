@@ -3,23 +3,22 @@ const jobsService = require("./jobs.service");
 
 
 exports.getJobs = async (req, res) => {
-
   try {
+    const filters = req.query;   // GET QUERY PARAMS
 
-    const { status, search } = req.query;
+    const jobs = await jobsService.getJobs(filters);
 
-    const jobs = await jobsService.getJobs(status, search);
-
-    res.json({ jobs });
+    res.json({
+      jobs
+    });
 
   } catch (error) {
-
     console.error(error);
 
-    res.status(500).json({ message: "Internal server error" });
-
+    res.status(500).json({
+      message: "Internal server error"
+    });
   }
-
 };
 
 
@@ -58,32 +57,115 @@ exports.getJobById = async (req, res) => {
   }
 };
 
+const parseExperience = (exp) => {
+  if (!exp) return {};
+
+  const clean = exp.toString().toLowerCase().trim();
+
+  // 3+
+  if (clean.includes("+")) {
+    const min = parseInt(clean.replace("+", ""));
+    return {
+      minExperience: min,
+      maxExperience: null,
+      experienceLabel: `${min}+ years`
+    };
+  }
+
+  // 2-5
+  if (clean.includes("-")) {
+    const [min, max] = clean.split("-").map(Number);
+    return {
+      minExperience: min,
+      maxExperience: max,
+      experienceLabel: `${min}-${max} years`
+    };
+  }
+
+  // single value
+  const val = Number(clean);
+  return {
+    minExperience: val,
+    maxExperience: val,
+    experienceLabel: `${val} years`
+  };
+};
+
+
+//  SALARY PARSER
+const parseSalary = (salaryRange) => {
+  if (!salaryRange) return {};
+
+  const cleaned = salaryRange.toLowerCase().replace(/,/g, "");
+  const numbers = cleaned.match(/\d+/g);
+
+  if (!numbers || numbers.length < 2) return {};
+
+  let min = Number(numbers[0]);
+  let max = Number(numbers[1]);
+
+  // convert LPA → INR
+  if (cleaned.includes("lpa")) {
+    min *= 100000;
+    max *= 100000;
+  }
+
+  return {
+    minSalary: min,
+    maxSalary: max,
+    currency: "INR"
+  };
+};
+
+//  EXPERIENCE LABEL GENERATOR
+const generateExperienceLabel = (min, max) => {
+  if (min != null && max != null) {
+    return `${min}-${max} years`;
+  }
+  if (min != null) {
+    return `${min}+ years`;
+  }
+  return null;
+};
+
+//  SALARY RANGE GENERATOR (IN LPA)
+const generateSalaryRange = (min, max) => {
+  if (min != null && max != null) {
+    const minLPA = (min / 100000).toFixed(0);
+    const maxLPA = (max / 100000).toFixed(0);
+    return `${minLPA}-${maxLPA} LPA`;
+  }
+  return null;
+};
 
 exports.createJob = async (req, res) => {
   try {
-
     const {
       title,
       department,
       location,
-      experience,
       jobType,
       description,
       responsibilities,
       skills,
       deadline,
       hrEmail,
-      hrPhone
+      hrPhone,
+
+      minExperience,
+      maxExperience,
+      minSalary,
+      maxSalary,
+      currency
     } = req.body;
 
     const createdById = req.user.id;
 
-    //  REQUIRED FIELDS
+    //  VALIDATION
     if (
       !title ||
       !department ||
       !location ||
-      !experience ||
       !jobType ||
       !description ||
       !skills ||
@@ -96,107 +178,69 @@ exports.createJob = async (req, res) => {
       });
     }
 
-    //  HR EMAIL VALIDATION
-    if (!hrEmail.endsWith("@dhatvibs.com")) {
-      return res.status(400).json({
-        message: "HR email must be from @dhatvibs.com domain"
-      });
+    //  FORMAT SKILLS
+    const skillsArray = Array.isArray(skills)
+      ? skills
+      : skills.split(",").map(s => s.trim());
+
+    //  AUTO GENERATE FIELDS
+    const experienceLabel = generateExperienceLabel(
+      minExperience ? Number(minExperience) : null,
+      maxExperience ? Number(maxExperience) : null
+    );
+
+    const salaryRange = generateSalaryRange(
+      minSalary ? Number(minSalary) : null,
+      maxSalary ? Number(maxSalary) : null
+    );
+
+    //  JOB ID GENERATION
+    const year = new Date().getFullYear();
+
+    const lastJob = await prisma.job.findFirst({
+      orderBy: { id: "desc" }
+    });
+
+    let nextNumber = 1;
+
+    if (lastJob?.jobId) {
+      const lastNumber = parseInt(lastJob.jobId.split("-").pop());
+      nextNumber = lastNumber + 1;
     }
 
-    // PHONE VALIDATION
-    if (!/^[0-9]{10}$/.test(hrPhone)) {
-      return res.status(400).json({
-        message: "Phone must be 10 digits"
-      });
-    }
+    const finalJobId = `JOB-${year}-${String(nextNumber).padStart(3, "0")}`;
 
-    //  DEADLINE VALIDATION
-    const deadlineDate = new Date(deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    //  CREATE JOB
+    const job = await prisma.job.create({
+      data: {
+        jobId: finalJobId,
+        title,
+        department,
+        location,
+        jobType,
+        description,
+        responsibilities: responsibilities || null,
+        skills: skillsArray,
+        deadline: new Date(deadline),
 
-    if (deadlineDate <= today) {
-      return res.status(400).json({
-        message: "Deadline must be a future date"
-      });
-    }
+        hrEmail,
+        hrPhone,
 
-    //  LOCATION VALIDATION
-    const INVALID_LOCATIONS = ["Remote", "Full-time"];
-    if (INVALID_LOCATIONS.includes(location)) {
-      return res.status(400).json({
-        message: "Location cannot be Remote or Full-time"
-      });
-    }
+        //  EXPERIENCE
+        minExperience: minExperience ? Number(minExperience) : null,
+        maxExperience: maxExperience ? Number(maxExperience) : null,
+        experienceLabel,
 
-    //  JOB TYPE VALIDATION
-    const ALLOWED_JOB_TYPES = ["Full-time", "Remote", "Hybrid"];
-    if (!ALLOWED_JOB_TYPES.includes(jobType)) {
-      return res.status(400).json({
-        message: "Invalid job type"
-      });
-    }
+        //  SALARY
+        minSalary: minSalary ? Number(minSalary) : null,
+        maxSalary: maxSalary ? Number(maxSalary) : null,
+        salaryRange,
+        currency: currency || "INR",
 
-    //  SKILLS ARRAY HANDLING (Prisma String[])
-    let skillsArray;
-
-    if (Array.isArray(skills)) {
-      skillsArray = skills;
-    } else {
-      skillsArray = skills.split(",").map(s => s.trim());
-    }
-
-    //  AUTO JOB ID + DUPLICATE SAFE (RETRY LOGIC)
-    let created = false;
-    let job;
-
-    while (!created) {
-      try {
-
-        const year = new Date().getFullYear();
-
-        const lastJob = await prisma.job.findFirst({
-          orderBy: { id: "desc" }
-        });
-
-        let nextNumber = 1;
-
-        if (lastJob && lastJob.jobId) {
-          const lastNumber = parseInt(lastJob.jobId.split("-").pop());
-          nextNumber = lastNumber + 1;
-        }
-
-        const finalJobId = `JOB-${year}-${String(nextNumber).padStart(3, "0")}`;
-
-        job = await jobsService.createJob({
-          jobId: finalJobId,
-          title,
-          department,
-          location,
-          experience: Number(experience),
-          jobType,
-          description,
-          responsibilities: responsibilities || null,
-          skills: skillsArray,
-          deadline: deadlineDate,
-          hrEmail,
-          hrPhone,
-          status: "ACTIVE",
-          createdById
-        });
-
-        created = true;
-
-      } catch (error) {
-
-        //  Retry if duplicate jobId
-        if (error.code === "P2002") {
-          continue;
-        }
-
-        throw error;
+        status: "ACTIVE",
+        createdById
       }
-    }
+    });
 
     res.status(201).json({
       message: "Job created successfully",
@@ -204,16 +248,13 @@ exports.createJob = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error("CREATE JOB ERROR:", error);
 
     res.status(500).json({
       message: "Internal server error"
     });
-
   }
 };
-
 
 exports.closeJob = async (req, res) => {
 
@@ -238,79 +279,52 @@ exports.closeJob = async (req, res) => {
 
 };
 
-
 exports.reopenJob = async (req, res) => {
   try {
-
     const jobId = Number(req.params.jobId);
+    const body = req.body;
 
-    const {
-      title,
-      department,
-      location,
-      experience,
-      jobType,
-      description,
-      responsibilities,
-      skills,
-      deadline,
-      hrEmail,
-      hrPhone
-    } = req.body;
-
-    //  Find existing job
     const existingJob = await prisma.job.findUnique({
       where: { id: jobId }
     });
 
     if (!existingJob) {
-      return res.status(404).json({
-        message: "Job not found"
-      });
+      return res.status(404).json({ message: "Job not found" });
     }
 
-    //  SKILLS handling (array)
-    let skillsArray;
+    // ✅ EXPERIENCE FIX
+    const expData = body.experience
+      ? parseExperience(body.experience)
+      : {};
 
-    if (skills) {
-      skillsArray = Array.isArray(skills)
-        ? skills
-        : skills.split(",").map(s => s.trim());
-    }
+    // ✅ SKILLS
+    const skillsArray = body.skills
+      ? (Array.isArray(body.skills)
+          ? body.skills
+          : body.skills.split(",").map(s => s.trim()))
+      : undefined;
 
-    //  DEADLINE validation (if provided)
-    let deadlineDate;
-
-    if (deadline) {
-      deadlineDate = new Date(deadline);
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (deadlineDate <= today) {
-        return res.status(400).json({
-          message: "Deadline must be future date"
-        });
-      }
-    }
-
-    // Update job (NO new jobId)
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
       data: {
-        title: title || existingJob.title,
-        department: department || existingJob.department,
-        location: location || existingJob.location,
-        experience: experience ? Number(experience) : existingJob.experience,
-        jobType: jobType || existingJob.jobType,
-        description: description || existingJob.description,
-        responsibilities: responsibilities ?? existingJob.responsibilities,
-        skills: skillsArray || existingJob.skills,
-        deadline: deadlineDate || existingJob.deadline,
-        hrEmail: hrEmail || existingJob.hrEmail,
-        hrPhone: hrPhone || existingJob.hrPhone,
+        title: body.title || existingJob.title,
+        department: body.department || existingJob.department,
+        location: body.location || existingJob.location,
 
-        // 🔥 MAIN POINT
+        ...expData,
+
+        jobType: body.jobType || existingJob.jobType,
+        description: body.description || existingJob.description,
+        responsibilities: body.responsibilities ?? existingJob.responsibilities,
+        skills: skillsArray || existingJob.skills,
+
+        deadline: body.deadline
+          ? new Date(body.deadline)
+          : existingJob.deadline,
+
+        hrEmail: body.hrEmail || existingJob.hrEmail,
+        hrPhone: body.hrPhone || existingJob.hrPhone,
+
         status: "ACTIVE"
       }
     });
@@ -321,54 +335,105 @@ exports.reopenJob = async (req, res) => {
     });
 
   } catch (error) {
-
-    console.error("REOPEN JOB ERROR:", error);
-
-    res.status(500).json({
-      message: "Internal server error"
-    });
-
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 exports.updateJob = async (req, res) => {
   try {
+    const jobParam = req.params.jobId;
+    const body = req.body;
 
-    const jobId = Number(req.params.jobId);
+    let job;
 
-    const {
-      title,
-      department,
-      location,
-      experience,
-      jobType,
-      description,
-      skills,
-      deadline
-    } = req.body;
+    // ✅ FIND JOB (IMPORTANT FIX)
+    if (!isNaN(jobParam)) {
+      job = await prisma.job.findUnique({
+        where: { id: Number(jobParam) }
+      });
+    } else {
+      job = await prisma.job.findUnique({
+        where: { jobId: jobParam }
+      });
+    }
 
-    const job = await prisma.job.update({
-      where: { id: jobId },
-      data: {
-        title,
-        department,
-        location,
-        experience,
-        jobType,
-        description,
-        skills,
-        deadline: new Date(deadline)
-      }
+    if (!job) {
+      return res.status(404).json({
+        message: "Job not found"
+      });
+    }
+
+    // ✅ SKILLS PARSER
+    const skillsArray = body.skills
+      ? (Array.isArray(body.skills)
+          ? body.skills
+          : body.skills.split(",").map(s => s.trim()))
+      : undefined;
+
+    // ✅ UPDATE DATA
+    const updateData = {
+      title: body.title || undefined,
+      department: body.department || undefined,
+      location: body.location || undefined,
+      jobType: body.jobType || undefined,
+      description: body.description || undefined,
+      responsibilities: body.responsibilities || undefined,
+
+      // EXPERIENCE
+      minExperience: body.minExperience
+        ? Number(body.minExperience)
+        : undefined,
+
+      maxExperience: body.maxExperience
+        ? Number(body.maxExperience)
+        : undefined,
+
+      experienceLabel: body.experienceLabel || undefined,
+
+      // SALARY
+      salaryRange: body.salaryRange || undefined,
+      minSalary: body.minSalary
+        ? Number(body.minSalary)
+        : undefined,
+      maxSalary: body.maxSalary
+        ? Number(body.maxSalary)
+        : undefined,
+      currency: body.currency || undefined,
+
+      skills: skillsArray,
+
+      deadline: body.deadline
+        ? new Date(body.deadline)
+        : undefined,
+
+      hrEmail: body.hrEmail || undefined,
+      hrPhone: body.hrPhone || undefined
+    };
+
+    // ✅ REMOVE UNDEFINED FIELDS
+    Object.keys(updateData).forEach(
+      key => updateData[key] === undefined && delete updateData[key]
+    );
+
+    // ✅ UPDATE USING CORRECT ID
+    const updatedJob = await prisma.job.update({
+      where: { id: job.id }, // ✅ FIXED
+      data: updateData
     });
 
     res.json({
       message: "Job updated successfully",
-      job
+      job: updatedJob
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("UPDATE JOB ERROR:", error);
+
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message
+    });
   }
 };
 

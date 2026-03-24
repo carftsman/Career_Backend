@@ -10,7 +10,7 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  * /api/jobs:
  *   get:
  *     summary: Get all jobs
- *     description: Fetch all jobs with optional filters like status and search keyword (title, department, skills).
+ *     description: Fetch all jobs with filters like status, search, experience range, and salary range.
  *     tags: [Jobs]
  *     parameters:
  *       - in: query
@@ -18,62 +18,34 @@ const roleMiddleware = require("../../middlewares/roleMiddleware");
  *         schema:
  *           type: string
  *           enum: [ACTIVE, CLOSED]
- *         required: false
- *         description: Filter jobs by status
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
  *           example: backend
- *         required: false
- *         description: Search jobs by title, department, skills, or description
+ *       - in: query
+ *         name: minExperience
+ *         schema:
+ *           type: integer
+ *           example: 2
+ *       - in: query
+ *         name: maxExperience
+ *         schema:
+ *           type: integer
+ *           example: 5
+ *       - in: query
+ *         name: minSalary
+ *         schema:
+ *           type: integer
+ *           example: 300000
+ *       - in: query
+ *         name: maxSalary
+ *         schema:
+ *           type: integer
+ *           example: 1000000
  *     responses:
  *       200:
  *         description: Jobs fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 jobs:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 1
- *                       jobId:
- *                         type: string
- *                         example: "#JOB-2026-001"
- *                       title:
- *                         type: string
- *                         example: Backend Developer
- *                       department:
- *                         type: string
- *                         example: Engineering
- *                       location:
- *                         type: string
- *                         example: Hyderabad
- *                       experience:
- *                         type: integer
- *                         example: 3
- *                       jobType:
- *                         type: string
- *                         example: Full-time
- *                       status:
- *                         type: string
- *                         example: ACTIVE
- *                       applicants:
- *                         type: integer
- *                         example: 5
- *                       postedDate:
- *                         type: string
- *                         format: date-time
- *       401:
- *         description: Unauthorized - Invalid or missing token
- *       500:
- *         description: Internal server error
  */
 
 router.get("/", jobsController.getJobs);
@@ -109,7 +81,7 @@ router.get("/:jobId", jobsController.getJobById);
  * /api/jobs:
  *   post:
  *     summary: Create a new job
- *     description: Allows HR to create a new job post in the system.
+ *     description: Allows HR to create a new job post with salary and experience range.
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
@@ -120,11 +92,9 @@ router.get("/:jobId", jobsController.getJobById);
  *           schema:
  *             type: object
  *             required:
- *               - jobId
  *               - title
  *               - department
  *               - location
- *               - experience
  *               - jobType
  *               - description
  *               - skills
@@ -140,36 +110,55 @@ router.get("/:jobId", jobsController.getJobById);
  *                 example: Engineering
  *               location:
  *                 type: string
- *                 example: Remote
- *               experience:
+ *                 example: Hyderabad
+ *
+ *               # ✅ EXPERIENCE (NEW STRUCTURE)
+ *               minExperience:
  *                 type: integer
- *                 description: Required years of experience
- *                 example: 3
+ *                 example: 2
+ *               maxExperience:
+ *                 type: integer
+ *                 example: 5
+ *
  *               jobType:
  *                 type: string
  *                 example: Full-time
+ *
  *               description:
  *                 type: string
- *                 example: Develop scalable backend APIs using Node.js and PostgreSQL
+ *                 example: Develop scalable backend APIs
+ *
  *               responsibilities:
  *                 type: string
- *                 description: Key responsibilities for the role
- *                 example: Design REST APIs, optimize performance, collaborate with frontend teams
+ *                 example: Build APIs, optimize performance
+ *
  *               skills:
  *                 type: string
- *                 description: Required skills for the role
  *                 example: NodeJS, PostgreSQL, Express
+ * 
+ *               minSalary:
+ *                 type: integer
+ *                 example: 500000
+ *               maxSalary:
+ *                 type: integer
+ *                 example: 1000000
+ *               currency:
+ *                 type: string
+ *                 example: INR
+ *
  *               deadline:
  *                 type: string
  *                 format: date
- *                 description: Last date to apply for the job
- *                 example: 2026-06-30
+ *                 example: 2026-12-31
+ *
  *               hrEmail:
  *                 type: string
  *                 example: hr@dhatvibs.com
+ *
  *               hrPhone:
  *                 type: string
  *                 example: "9876543210"
+ *
  *     responses:
  *       201:
  *         description: Job created successfully
@@ -178,21 +167,19 @@ router.get("/:jobId", jobsController.getJobById);
  *             schema:
  *               type: object
  *               properties:
- *                 id:
- *                   type: integer
- *                   example: 4
- *                 title:
+ *                 message:
  *                   type: string
- *                   example: Backend Developer
- *                 status:
- *                   type: string
- *                   example: ACTIVE
+ *                   example: Job created successfully
+ *                 job:
+ *                   type: object
  *       400:
- *         description: Invalid request data
+ *         description: Invalid input
  *       401:
- *         description: Unauthorized - Invalid or missing token
+ *         description: Unauthorized
  *       403:
  *         description: Forbidden - Only HR can create jobs
+ *       500:
+ *         description: Internal server error
  */
 router.post(
   "/",
@@ -239,7 +226,7 @@ router.patch(
  * /api/jobs/{jobId}/reopen:
  *   patch:
  *     summary: Reopen and update a job
- *     description: Allows HR to reopen a closed job and optionally update job details like title, skills, deadline, etc. The same jobId will be reused.
+ *     description: Allows HR to reopen a closed job and update job details including experience range and salary.
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
@@ -247,10 +234,10 @@ router.patch(
  *       - in: path
  *         name: jobId
  *         required: true
- *         description: ID of the job to reopen
+ *         description: ID or JOB-XXXX of the job to reopen
  *         schema:
- *           type: integer
- *           example: 1
+ *           type: string
+ *           example: JOB-2026-021
  *     requestBody:
  *       required: false
  *       content:
@@ -258,63 +245,82 @@ router.patch(
  *           schema:
  *             type: object
  *             properties:
+
  *               title:
  *                 type: string
  *                 example: Backend Developer
+
  *               department:
  *                 type: string
  *                 example: Engineering
+
  *               location:
  *                 type: string
  *                 example: Hyderabad
- *               experience:
+
+ *               # ✅ EXPERIENCE RANGE
+ *               minExperience:
  *                 type: integer
- *                 example: 3
+ *                 example: 2
+ *               maxExperience:
+ *                 type: integer
+ *                 example: 5
+ *               experienceLabel:
+ *                 type: string
+ *                 example: 2-5 years
+
  *               jobType:
  *                 type: string
  *                 example: Full-time
+
  *               description:
  *                 type: string
  *                 example: Build scalable backend APIs
+
  *               responsibilities:
  *                 type: string
  *                 example: Develop APIs, optimize performance
+
  *               skills:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ["NodeJS", "PostgreSQL"]
+ *                 type: string
+ *                 example: NodeJS, PostgreSQL, Express
+
+ *               # ✅ SALARY
+ *               salaryRange:
+ *                 type: string
+ *                 example: 5-10 LPA
+ *               minSalary:
+ *                 type: integer
+ *                 example: 500000
+ *               maxSalary:
+ *                 type: integer
+ *                 example: 1000000
+ *               currency:
+ *                 type: string
+ *                 example: INR
+
  *               deadline:
  *                 type: string
  *                 format: date
- *                 example: 2026-08-01
+ *                 example: 2026-12-31
+
  *               hrEmail:
  *                 type: string
  *                 example: hr@dhatvibs.com
+
  *               hrPhone:
  *                 type: string
  *                 example: "9876543210"
+
  *     responses:
  *       200:
  *         description: Job reopened successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Job reopened successfully
- *                 job:
- *                   type: object
  *       400:
- *         description: Invalid input (e.g., past deadline)
+ *         description: Invalid input
  *       401:
  *         description: Unauthorized
  *       404:
  *         description: Job not found
- *       500:
- *         description: Internal server error
  */
 router.patch(
   "/:jobId/reopen",
@@ -328,7 +334,7 @@ router.patch(
  * /api/jobs/{jobId}:
  *   patch:
  *     summary: Update an existing job
- *     description: HR can update job details such as title, department, location, experience, job type, description, skills, and deadline.
+ *     description: HR can update job details including experience range and salary.
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
@@ -336,10 +342,10 @@ router.patch(
  *       - in: path
  *         name: jobId
  *         required: true
+ *         description: ID or JOB-XXXX of the job
  *         schema:
- *           type: integer
- *         description: ID of the job to update
- *         example: 1
+ *           type: string
+ *           example: JOB-2026-021
  *     requestBody:
  *       required: true
  *       content:
@@ -347,34 +353,78 @@ router.patch(
  *           schema:
  *             type: object
  *             properties:
+
  *               title:
  *                 type: string
  *                 example: Backend Developer
+
  *               department:
  *                 type: string
  *                 example: Engineering
+
  *               location:
  *                 type: string
- *                 example: Remote
- *               experience:
+ *                 example: Hyderabad
+
+ *               # ✅ EXPERIENCE RANGE
+ *               minExperience:
  *                 type: integer
- *                 example: 3
+ *                 example: 1
+ *               maxExperience:
+ *                 type: integer
+ *                 example: 4
+ *               experienceLabel:
+ *                 type: string
+ *                 example: 1-4 years
+
  *               jobType:
  *                 type: string
  *                 example: Full-time
+
  *               description:
  *                 type: string
  *                 example: Develop scalable backend APIs
+
+ *               responsibilities:
+ *                 type: string
+ *                 example: Build APIs, optimize performance
+
  *               skills:
  *                 type: string
  *                 example: NodeJS, PostgreSQL
+
+ *               # ✅ SALARY
+ *               salaryRange:
+ *                 type: string
+ *                 example: 4-8 LPA
+ *               minSalary:
+ *                 type: integer
+ *                 example: 400000
+ *               maxSalary:
+ *                 type: integer
+ *                 example: 800000
+ *               currency:
+ *                 type: string
+ *                 example: INR
+
  *               deadline:
  *                 type: string
  *                 format: date
  *                 example: 2026-06-30
+
+ *               hrEmail:
+ *                 type: string
+ *                 example: hr@dhatvibs.com
+
+ *               hrPhone:
+ *                 type: string
+ *                 example: "9876543210"
+
  *     responses:
  *       200:
  *         description: Job updated successfully
+ *       400:
+ *         description: Invalid input
  *       401:
  *         description: Unauthorized
  *       404:
