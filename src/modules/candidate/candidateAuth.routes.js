@@ -48,6 +48,7 @@ router.post("/forgot-password", forgotPassword);
  *           example:
  *             token: "reset-token-from-email"
  *             newPassword: "NewPassword@123"
+ *             confirmPassword: "NewPassword@123"
  *     responses:
  *       200:
  *         description: Password reset successful
