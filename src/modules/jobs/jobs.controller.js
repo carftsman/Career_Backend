@@ -58,13 +58,13 @@ exports.getJobById = async (req, res) => {
 };
 
 const parseExperience = (exp) => {
-  if (!exp) return {};
+  if (exp === undefined || exp === null || exp === "") return {};
 
   const clean = exp.toString().toLowerCase().trim();
 
   // 3+
   if (clean.includes("+")) {
-    const min = parseInt(clean.replace("+", ""));
+    const min = parseFloat(clean.replace("+", ""));
     return {
       minExperience: min,
       maxExperience: null,
@@ -72,7 +72,7 @@ const parseExperience = (exp) => {
     };
   }
 
-  // 2-5
+  // 2-5 or 2.5-4.5
   if (clean.includes("-")) {
     const [min, max] = clean.split("-").map(Number);
     return {
@@ -82,8 +82,9 @@ const parseExperience = (exp) => {
     };
   }
 
-  // single value
+  // single value (2 or 2.5)
   const val = Number(clean);
+
   return {
     minExperience: val,
     maxExperience: val,
@@ -93,21 +94,30 @@ const parseExperience = (exp) => {
 
 
 //  SALARY PARSER
-const parseSalary = (salaryRange) => {
-  if (!salaryRange) return {};
+const parseSalary = (salaryInput) => {
+  if (!salaryInput) return {};
 
-  const cleaned = salaryRange.toLowerCase().replace(/,/g, "");
-  const numbers = cleaned.match(/\d+/g);
+  const cleaned = salaryInput.toString().toLowerCase().replace(/,/g, "").trim();
 
-  if (!numbers || numbers.length < 2) return {};
+  // match decimals also
+  const numbers = cleaned.match(/\d+(\.\d+)?/g);
 
-  let min = Number(numbers[0]);
-  let max = Number(numbers[1]);
+  if (!numbers) return {};
+
+  let min = null;
+  let max = null;
+
+  if (numbers.length === 1) {
+    min = parseFloat(numbers[0]);
+  } else {
+    min = parseFloat(numbers[0]);
+    max = parseFloat(numbers[1]);
+  }
 
   // convert LPA → INR
   if (cleaned.includes("lpa")) {
-    min *= 100000;
-    max *= 100000;
+    min = min != null ? min * 100000 : null;
+    max = max != null ? max * 100000 : null;
   }
 
   return {
@@ -119,21 +129,18 @@ const parseSalary = (salaryRange) => {
 
 //  EXPERIENCE LABEL GENERATOR
 const generateExperienceLabel = (min, max) => {
-  if (min != null && max != null) {
-    return `${min}-${max} years`;
-  }
-  if (min != null) {
-    return `${min}+ years`;
-  }
+  if (min != null && max != null) return `${min}-${max} years`;
+  if (min != null) return `${min}+ years`;
   return null;
 };
 
 //  SALARY RANGE GENERATOR (IN LPA)
 const generateSalaryRange = (min, max) => {
   if (min != null && max != null) {
-    const minLPA = (min / 100000).toFixed(0);
-    const maxLPA = (max / 100000).toFixed(0);
-    return `${minLPA}-${maxLPA} LPA`;
+    return `${(min / 100000).toFixed(1)}-${(max / 100000).toFixed(1)} LPA`;
+  }
+  if (min != null) {
+    return `${(min / 100000).toFixed(1)}+ LPA`;
   }
   return null;
 };
@@ -151,7 +158,6 @@ exports.createJob = async (req, res) => {
       deadline,
       hrEmail,
       hrPhone,
-
       minExperience,
       maxExperience,
       minSalary,
@@ -161,7 +167,7 @@ exports.createJob = async (req, res) => {
 
     const createdById = req.user.id;
 
-    //  VALIDATION
+    // VALIDATION
     if (
       !title ||
       !department ||
@@ -178,23 +184,42 @@ exports.createJob = async (req, res) => {
       });
     }
 
-    //  FORMAT SKILLS
+    // SKILLS
     const skillsArray = Array.isArray(skills)
       ? skills
       : skills.split(",").map(s => s.trim());
 
-    //  AUTO GENERATE FIELDS
+    // EXPERIENCE PARSE (FIXED)
+    const hasMin = minExperience !== undefined && minExperience !== null && minExperience !== "";
+    const hasMax = maxExperience !== undefined && maxExperience !== null && maxExperience !== "";
+
+    const expData = parseExperience(
+      hasMin && hasMax
+        ? `${minExperience}-${maxExperience}`
+        : minExperience
+    );
+
+    // SALARY PARSE (FIXED)
+    const hasMinSalary = minSalary !== undefined && minSalary !== null && minSalary !== "";
+    const hasMaxSalary = maxSalary !== undefined && maxSalary !== null && maxSalary !== "";
+
+    const salaryData = parseSalary(
+      hasMinSalary && hasMaxSalary
+        ? `${minSalary}-${maxSalary} LPA`
+        : minSalary
+    );
+
     const experienceLabel = generateExperienceLabel(
-      minExperience ? Number(minExperience) : null,
-      maxExperience ? Number(maxExperience) : null
+      expData.minExperience,
+      expData.maxExperience
     );
 
     const salaryRange = generateSalaryRange(
-      minSalary ? Number(minSalary) : null,
-      maxSalary ? Number(maxSalary) : null
+      salaryData.minSalary,
+      salaryData.maxSalary
     );
 
-    //  JOB ID GENERATION
+    // JOB ID GENERATION
     const year = new Date().getFullYear();
 
     const lastJob = await prisma.job.findFirst({
@@ -210,7 +235,7 @@ exports.createJob = async (req, res) => {
 
     const finalJobId = `JOB-${year}-${String(nextNumber).padStart(3, "0")}`;
 
-    //  CREATE JOB
+    // CREATE JOB
     const job = await prisma.job.create({
       data: {
         jobId: finalJobId,
@@ -226,14 +251,21 @@ exports.createJob = async (req, res) => {
         hrEmail,
         hrPhone,
 
-        //  EXPERIENCE
-        minExperience: minExperience ? Number(minExperience) : null,
-        maxExperience: maxExperience ? Number(maxExperience) : null,
+        // EXPERIENCE ✅ (0 supported)
+        minExperience:
+          expData.minExperience !== null && expData.minExperience !== undefined
+            ? String(expData.minExperience)
+            : null,
+
+        maxExperience:
+          expData.maxExperience !== null && expData.maxExperience !== undefined
+            ? String(expData.maxExperience)
+            : null,
         experienceLabel,
 
-        //  SALARY
-        minSalary: minSalary ? Number(minSalary) : null,
-        maxSalary: maxSalary ? Number(maxSalary) : null,
+        // SALARY ✅ (decimal supported)
+        minSalary: salaryData.minSalary,
+        maxSalary: salaryData.maxSalary,
         salaryRange,
         currency: currency || "INR",
 
@@ -255,7 +287,6 @@ exports.createJob = async (req, res) => {
     });
   }
 };
-
 exports.closeJob = async (req, res) => {
 
   try {
@@ -300,8 +331,8 @@ exports.reopenJob = async (req, res) => {
     // ✅ SKILLS
     const skillsArray = body.skills
       ? (Array.isArray(body.skills)
-          ? body.skills
-          : body.skills.split(",").map(s => s.trim()))
+        ? body.skills
+        : body.skills.split(",").map(s => s.trim()))
       : undefined;
 
     const updatedJob = await prisma.job.update({
@@ -367,8 +398,8 @@ exports.updateJob = async (req, res) => {
     // ✅ SKILLS PARSER
     const skillsArray = body.skills
       ? (Array.isArray(body.skills)
-          ? body.skills
-          : body.skills.split(",").map(s => s.trim()))
+        ? body.skills
+        : body.skills.split(",").map(s => s.trim()))
       : undefined;
 
     // ✅ UPDATE DATA

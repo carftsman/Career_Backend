@@ -51,8 +51,8 @@ model Job {
   department  String
   location    String
 
-  minExperience Int?
-  maxExperience Int?
+  minExperience String?
+  maxExperience String?
   experienceLabel String?
   jobType     String
 
@@ -61,8 +61,8 @@ model Job {
   skills      String[]
  
   salaryRange String?
-  minSalary   Int?
-  maxSalary   Int?
+  minSalary   Float?
+  maxSalary   Float?
   currency    String?
   deadline    DateTime
   status      JobStatus @default(ACTIVE)
