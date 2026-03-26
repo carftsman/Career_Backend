@@ -378,7 +378,7 @@ exports.updateJob = async (req, res) => {
 
     let job;
 
-    // ✅ FIND JOB (IMPORTANT FIX)
+    // ✅ FIND JOB
     if (!isNaN(jobParam)) {
       job = await prisma.job.findUnique({
         where: { id: Number(jobParam) }
@@ -402,6 +402,63 @@ exports.updateJob = async (req, res) => {
         : body.skills.split(",").map(s => s.trim()))
       : undefined;
 
+    // ✅ SAFE CHECKS (IMPORTANT)
+    const hasMinExp =
+      body.minExperience !== undefined &&
+      body.minExperience !== null &&
+      body.minExperience !== "";
+
+    const hasMaxExp =
+      body.maxExperience !== undefined &&
+      body.maxExperience !== null &&
+      body.maxExperience !== "";
+
+    const hasMinSalary =
+      body.minSalary !== undefined &&
+      body.minSalary !== null &&
+      body.minSalary !== "";
+
+    const hasMaxSalary =
+      body.maxSalary !== undefined &&
+      body.maxSalary !== null &&
+      body.maxSalary !== "";
+
+    // ✅ EXPERIENCE LABEL GENERATOR (AUTO FIX)
+    const generateExperienceLabel = (min, max) => {
+      const format = (val) =>
+        Number(val) % 1 === 0 ? Number(val) : val;
+
+      if (min != null && max != null) {
+        return `${format(min)}-${format(max)} years`;
+      }
+      if (min != null) {
+        return `${format(min)}+ years`;
+      }
+      return null;
+    };
+
+    // ✅ GENERATE LABEL (DO NOT TRUST FRONTEND)
+    const experienceLabel = hasMinExp
+      ? generateExperienceLabel(
+        Number(body.minExperience),
+        hasMaxExp ? Number(body.maxExperience) : null
+      )
+      : undefined;
+    const generateSalaryRange = (min, max) => {
+      const format = (val) =>
+        Number(val) % 1 === 0 ? Number(val) : Number(val).toFixed(1);
+
+      if (min != null && max != null) {
+        return `${format(min / 100000)}-${format(max / 100000)} LPA`;
+      }
+
+      if (min != null) {
+        return `${format(min / 100000)}+ LPA`;
+      }
+
+      return null;
+    };
+
     // ✅ UPDATE DATA
     const updateData = {
       title: body.title || undefined,
@@ -411,29 +468,26 @@ exports.updateJob = async (req, res) => {
       description: body.description || undefined,
       responsibilities: body.responsibilities || undefined,
 
-      // EXPERIENCE
-      minExperience: body.minExperience
-        ? Number(body.minExperience)
-        : undefined,
+      // ✅ EXPERIENCE (STRING FIX + DECIMAL SUPPORT)
+      minExperience: hasMinExp ? String(body.minExperience) : undefined,
+      maxExperience: hasMaxExp ? String(body.maxExperience) : undefined,
+      experienceLabel,
 
-      maxExperience: body.maxExperience
-        ? Number(body.maxExperience)
+      // ✅ SALARY
+      salaryRange: hasMinSalary
+        ? generateSalaryRange(
+          Number(body.minSalary),
+          hasMaxSalary ? Number(body.maxSalary) : null
+        )
         : undefined,
-
-      experienceLabel: body.experienceLabel || undefined,
-
-      // SALARY
-      salaryRange: body.salaryRange || undefined,
-      minSalary: body.minSalary
-        ? Number(body.minSalary)
-        : undefined,
-      maxSalary: body.maxSalary
-        ? Number(body.maxSalary)
-        : undefined,
+      minSalary: hasMinSalary ? Number(body.minSalary) : undefined,
+      maxSalary: hasMaxSalary ? Number(body.maxSalary) : undefined,
       currency: body.currency || undefined,
 
+      // ✅ SKILLS
       skills: skillsArray,
 
+      // ✅ DATE
       deadline: body.deadline
         ? new Date(body.deadline)
         : undefined,
@@ -447,9 +501,9 @@ exports.updateJob = async (req, res) => {
       key => updateData[key] === undefined && delete updateData[key]
     );
 
-    // ✅ UPDATE USING CORRECT ID
+    // ✅ UPDATE
     const updatedJob = await prisma.job.update({
-      where: { id: job.id }, // ✅ FIXED
+      where: { id: job.id },
       data: updateData
     });
 

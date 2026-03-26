@@ -103,7 +103,63 @@ const resetPassword = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+// const resetPassword = async (req, res) => {
+//   try {
+//     const { token, newPassword, confirmPassword } = req.body;
 
+//     if (newPassword !== confirmPassword) {
+//       return res.status(400).json({
+//         message: "Passwords do not match"
+//       });
+//     }
+
+//     if (!validatePassword(newPassword)) {
+//       return res.status(400).json({
+//         message:
+//           "Password must be 8+ chars, include uppercase, lowercase, number & special character"
+//       });
+//     }
+
+//     const hashedToken = crypto
+//       .createHash("sha256")
+//       .update(token)
+//       .digest("hex");
+
+//     const candidate = await prisma.candidate.findFirst({
+//       where: {
+//         resetToken: hashedToken,
+//         resetTokenExpiry: {
+//           gt: new Date()
+//         }
+//       }
+//     });
+
+//     if (!candidate) {
+//       return res.status(400).json({
+//         message: "Invalid or expired token"
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+//     await prisma.candidate.update({
+//       where: { id: candidate.id },
+//       data: {
+//         password: hashedPassword,
+//         resetToken: null,
+//         resetTokenExpiry: null
+//       }
+//     });
+
+//     return res.status(200).json({
+//       message: "Password reset successful"
+//     });
+
+//   } catch (error) {
+//     console.error("RESET PASSWORD ERROR:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 
 module.exports = {
   forgotPassword,
