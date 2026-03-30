@@ -137,12 +137,42 @@ const generateExperienceLabel = (min, max) => {
 //  SALARY RANGE GENERATOR (IN LPA)
 const generateSalaryRange = (min, max) => {
   if (min != null && max != null) {
-    return `${(min / 100000).toFixed(1)}-${(max / 100000).toFixed(1)} LPA`;
+    return `${formatSalary(min)} - ${formatSalary(max)}`;
   }
+
   if (min != null) {
-    return `${(min / 100000).toFixed(1)}+ LPA`;
+    return `${formatSalary(min)}+`;
   }
+
   return null;
+};
+
+const getEndOfDay = (date) => {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
+
+const formatSalary = (amount) => {
+  if (amount == null) return null;
+
+  // Less than 1 lakh
+  if (amount < 100000) {
+    return `${amount}`;
+  }
+
+  // Lakhs (up to < 1 Cr)
+  if (amount >= 100000 && amount < 10000000) {
+    return `${(amount / 100000).toFixed(1).replace(/\.0$/, "")} LPA`;
+  }
+
+  // Crores (>= 1 Cr only)
+  if (amount >= 10000000) {
+    const cr = amount / 10000000;
+    return `${cr.toFixed(1).replace(/\.0$/, "")} Cr`;
+  }
+
+  return `${amount}`;
 };
 
 exports.createJob = async (req, res) => {
@@ -203,11 +233,23 @@ exports.createJob = async (req, res) => {
     const hasMinSalary = minSalary !== undefined && minSalary !== null && minSalary !== "";
     const hasMaxSalary = maxSalary !== undefined && maxSalary !== null && maxSalary !== "";
 
-    const salaryData = parseSalary(
-      hasMinSalary && hasMaxSalary
-        ? `${minSalary}-${maxSalary} LPA`
-        : minSalary
-    );
+    let salaryData = {};
+
+    if (typeof minSalary === "number") {
+      //  Already INR → DO NOT convert
+      salaryData = {
+        minSalary: minSalary,
+        maxSalary: hasMaxSalary ? maxSalary : null,
+        currency: currency || "INR"
+      };
+    } else {
+      //  If string like "2-5 LPA"
+      salaryData = parseSalary(
+        hasMinSalary && hasMaxSalary
+          ? `${minSalary}-${maxSalary}`
+          : minSalary
+      );
+    }
 
     const experienceLabel = generateExperienceLabel(
       expData.minExperience,
@@ -246,12 +288,12 @@ exports.createJob = async (req, res) => {
         description,
         responsibilities: responsibilities || null,
         skills: skillsArray,
-        deadline: new Date(deadline),
+        deadline: getEndOfDay(deadline),
 
         hrEmail,
         hrPhone,
 
-        // EXPERIENCE ✅ (0 supported)
+        // EXPERIENCE  (0 supported)
         minExperience:
           expData.minExperience !== null && expData.minExperience !== undefined
             ? String(expData.minExperience)
@@ -263,7 +305,7 @@ exports.createJob = async (req, res) => {
             : null,
         experienceLabel,
 
-        // SALARY ✅ (decimal supported)
+        // SALARY  (decimal supported)
         minSalary: salaryData.minSalary,
         maxSalary: salaryData.maxSalary,
         salaryRange,
@@ -323,12 +365,12 @@ exports.reopenJob = async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // ✅ EXPERIENCE FIX
+    //  EXPERIENCE FIX
     const expData = body.experience
       ? parseExperience(body.experience)
       : {};
 
-    // ✅ SKILLS
+    //  SKILLS
     const skillsArray = body.skills
       ? (Array.isArray(body.skills)
         ? body.skills
@@ -350,7 +392,7 @@ exports.reopenJob = async (req, res) => {
         skills: skillsArray || existingJob.skills,
 
         deadline: body.deadline
-          ? new Date(body.deadline)
+          ? getEndOfDay(body.deadline)
           : existingJob.deadline,
 
         hrEmail: body.hrEmail || existingJob.hrEmail,
@@ -378,7 +420,7 @@ exports.updateJob = async (req, res) => {
 
     let job;
 
-    // ✅ FIND JOB
+    //  FIND JOB
     if (!isNaN(jobParam)) {
       job = await prisma.job.findUnique({
         where: { id: Number(jobParam) }
@@ -395,14 +437,14 @@ exports.updateJob = async (req, res) => {
       });
     }
 
-    // ✅ SKILLS PARSER
+    //  SKILLS PARSER
     const skillsArray = body.skills
       ? (Array.isArray(body.skills)
         ? body.skills
         : body.skills.split(",").map(s => s.trim()))
       : undefined;
 
-    // ✅ SAFE CHECKS (IMPORTANT)
+    //  SAFE CHECKS (IMPORTANT)
     const hasMinExp =
       body.minExperience !== undefined &&
       body.minExperience !== null &&
@@ -423,7 +465,7 @@ exports.updateJob = async (req, res) => {
       body.maxSalary !== null &&
       body.maxSalary !== "";
 
-    // ✅ EXPERIENCE LABEL GENERATOR (AUTO FIX)
+    //  EXPERIENCE LABEL GENERATOR (AUTO FIX)
     const generateExperienceLabel = (min, max) => {
       const format = (val) =>
         Number(val) % 1 === 0 ? Number(val) : val;
@@ -437,7 +479,7 @@ exports.updateJob = async (req, res) => {
       return null;
     };
 
-    // ✅ GENERATE LABEL (DO NOT TRUST FRONTEND)
+    //  GENERATE LABEL (DO NOT TRUST FRONTEND)
     const experienceLabel = hasMinExp
       ? generateExperienceLabel(
         Number(body.minExperience),
@@ -445,21 +487,18 @@ exports.updateJob = async (req, res) => {
       )
       : undefined;
     const generateSalaryRange = (min, max) => {
-      const format = (val) =>
-        Number(val) % 1 === 0 ? Number(val) : Number(val).toFixed(1);
-
       if (min != null && max != null) {
-        return `${format(min / 100000)}-${format(max / 100000)} LPA`;
+        return `${formatSalary(min)} - ${formatSalary(max)}`;
       }
 
       if (min != null) {
-        return `${format(min / 100000)}+ LPA`;
+        return `${formatSalary(min)}+`;
       }
 
       return null;
     };
 
-    // ✅ UPDATE DATA
+    //  UPDATE DATA
     const updateData = {
       title: body.title || undefined,
       department: body.department || undefined,
@@ -468,12 +507,12 @@ exports.updateJob = async (req, res) => {
       description: body.description || undefined,
       responsibilities: body.responsibilities || undefined,
 
-      // ✅ EXPERIENCE (STRING FIX + DECIMAL SUPPORT)
+      //  EXPERIENCE (STRING FIX + DECIMAL SUPPORT)
       minExperience: hasMinExp ? String(body.minExperience) : undefined,
       maxExperience: hasMaxExp ? String(body.maxExperience) : undefined,
       experienceLabel,
 
-      // ✅ SALARY
+      //  SALARY
       salaryRange: hasMinSalary
         ? generateSalaryRange(
           Number(body.minSalary),
@@ -484,24 +523,24 @@ exports.updateJob = async (req, res) => {
       maxSalary: hasMaxSalary ? Number(body.maxSalary) : undefined,
       currency: body.currency || undefined,
 
-      // ✅ SKILLS
+      //  SKILLS
       skills: skillsArray,
 
-      // ✅ DATE
+      //  DATE
       deadline: body.deadline
-        ? new Date(body.deadline)
+        ? getEndOfDay(body.deadline)
         : undefined,
 
       hrEmail: body.hrEmail || undefined,
       hrPhone: body.hrPhone || undefined
     };
 
-    // ✅ REMOVE UNDEFINED FIELDS
+    //  REMOVE UNDEFINED FIELDS
     Object.keys(updateData).forEach(
       key => updateData[key] === undefined && delete updateData[key]
     );
 
-    // ✅ UPDATE
+    //  UPDATE
     const updatedJob = await prisma.job.update({
       where: { id: job.id },
       data: updateData
