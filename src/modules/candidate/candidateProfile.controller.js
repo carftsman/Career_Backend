@@ -1,4 +1,3 @@
-
 const prisma = require("../../prisma");
 const uploadToAzure = require("../../cloud/azureUpload");
 
@@ -11,7 +10,8 @@ exports.updateProfile = async (req, res) => {
     let photoUrl = null;
     let certificateUrls = [];
 
-    //  FILE UPLOADS
+    // FILE UPLOADS
+    
     if (files?.photo) {
       const file = files.photo[0];
       const fileName = `profile-${candidateId}-${Date.now()}-${file.originalname}`;
@@ -26,19 +26,44 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    //  SAFE VALUE (CORE FIX)
+    // SAFE VALUE HANDLER
+
     const safeValue = (val) => {
       return val && val !== "string" && val !== "" ? val : undefined;
     };
 
-    //  ARRAY PARSER (FIXED)
+    // ARRAY PARSER (FINAL FIXED)
+
     const toArray = (field) => {
-      if (!field || field === "string") return undefined; // important for update
+      if (field === undefined) return undefined; // not sent → don't update
+
+      if (
+        field === null ||
+        field === "" ||
+        field === "string"
+      ) {
+        return []; // clear existing values
+      }
+
+      // Handle JSON string like "[...]"
+      if (typeof field === "string" && field.startsWith("[")) {
+        try {
+          return JSON.parse(field);
+        } catch {
+          return [];
+        }
+      }
+
       return Array.isArray(field)
         ? field
         : field.split(",").map((s) => s.trim());
     };
-    //  UPDATE DATA (only provided fields will update)
+
+    // PARSED ARRAYS
+    const skillsArray = toArray(data.skills);
+    const languagesArray = toArray(data.languages);
+
+    // UPDATE DATA
     const updateData = {
       dob: data.dob ? new Date(data.dob) : undefined,
 
@@ -49,8 +74,9 @@ exports.updateProfile = async (req, res) => {
       country: safeValue(data.country),
 
       photoUrl: photoUrl || undefined,
-      certificateUrls:
-        certificateUrls.length > 0 ? certificateUrls : undefined,
+
+      // allow replace OR clear certificates
+      ...(files?.certificates && { certificateUrls }),
 
       qualification: safeValue(data.qualification),
       degree: safeValue(data.degree),
@@ -70,11 +96,12 @@ exports.updateProfile = async (req, res) => {
       currentRole: safeValue(data.currentRole),
       previousCompanies: safeValue(data.previousCompanies),
 
-      ...(toArray(data.skills) && { skills: toArray(data.skills) }),
-      ...(toArray(data.languages) && { languages: toArray(data.languages) }),
+      //  Correct conditional updates
+      ...(skillsArray !== undefined && { skills: skillsArray }),
+      ...(languagesArray !== undefined && { languages: languagesArray }),
     };
 
-    //  UPSERT PROFILE
+    // UPSERT PROFILE
     const profile = await prisma.candidateProfile.upsert({
       where: { candidateId },
 
@@ -112,12 +139,13 @@ exports.updateProfile = async (req, res) => {
         currentRole: safeValue(data.currentRole) ?? null,
         previousCompanies: safeValue(data.previousCompanies) ?? null,
 
-        skills: toArray(data.skills) || [],
-        languages: toArray(data.languages) || [],
+        // default empty arrays
+        skills: skillsArray ?? [],
+        languages: languagesArray ?? [],
       },
     });
 
-    res.json({
+    return res.json({
       message: "Profile updated successfully",
       profile,
     });
@@ -125,7 +153,7 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     console.error("PROFILE UPDATE ERROR:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Internal server error",
     });
   }

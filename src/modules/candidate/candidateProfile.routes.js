@@ -11,10 +11,20 @@ const uploadMiddleware = require("../../middlewares/uploadMiddleware");
  * /api/candidate/profile:
  *   put:
  *     summary: Update candidate profile with photo and certificates
- *     description: Candidate updates profile including personal, education, experience details, profile photo, and multiple certificates upload.
+ *     description: |
+ *       Update candidate profile details including personal info, education, experience,
+ *       profile photo, and certificates.
+ *
+ *       ⚠️ IMPORTANT (Frontend Usage Rules):
+ *       - skills & languages must be sent as JSON string arrays
+ *         Example: '["NodeJS","React"]'
+ *       - To CLEAR values → send '[]'
+ *       - To KEEP existing values → do NOT send the field
+ *
  *     tags: [Candidate Profile]
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -25,55 +35,91 @@ const uploadMiddleware = require("../../middlewares/uploadMiddleware");
  *               photo:
  *                 type: string
  *                 format: binary
- *                 description: Profile photo
+ *                 description: Profile photo file
+ *
  *               certificates:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Upload multiple certificates
+ *                 description: Upload multiple certificate files
+ *
  *               dob:
  *                 type: string
  *                 format: date
+ *                 example: 1998-05-20
+ *
  *               gender:
  *                 type: string
+ *                 example: Female
+ *
  *               address:
  *                 type: string
+ *
  *               city:
  *                 type: string
+ *
  *               state:
  *                 type: string
+ *
  *               country:
  *                 type: string
+ *
  *               qualification:
  *                 type: string
+ *
  *               degree:
  *                 type: string
+ *
  *               university:
  *                 type: string
+ *
  *               graduationYear:
  *                 type: integer
+ *                 example: 2022
+ *
  *               cgpa:
  *                 type: number
+ *                 example: 8.5
+ *
  *               totalExperience:
  *                 type: integer
+ *                 example: 2
+ *
  *               currentCompany:
  *                 type: string
+ *
  *               currentRole:
  *                 type: string
+ *
  *               previousCompanies:
  *                 type: string
+ *
  *               skills:
  *                 type: string
- *                 example: NodeJS, React
+ *                 example: '["NodeJS","React"]'
+ *                 description: |
+ *                   Send as JSON string array.
+ *                   - Example: '["NodeJS","React"]'
+ *                   - Send '[]' to clear
+ *                   - Do not send to keep existing values
+ *
  *               languages:
  *                 type: string
- *                 example: English, Hindi
+ *                 example: '["English","Telugu"]'
+ *                 description: |
+ *                   Send as JSON string array.
+ *                   - Example: '["English","Telugu"]'
+ *                   - Send '[]' to clear
+ *                   - Do not send to keep existing values
+ *
  *     responses:
  *       200:
  *         description: Profile updated successfully
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       500:
  *         description: Internal server error
  */

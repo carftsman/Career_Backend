@@ -418,7 +418,7 @@ exports.getMyApplications = async (req, res) => {
       salary: app.job.salaryRange,
       experience: app.job.experienceLabel,
       skills: app.job.skills || [],
-
+      description: app.job.description,
       appliedDate: app.createdAt
     }));
 
