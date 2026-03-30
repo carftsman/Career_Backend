@@ -15,7 +15,7 @@ const uploadMiddleware = require("../../middlewares/uploadMiddleware");
  *       Update candidate profile details including personal info, education, experience,
  *       profile photo, and certificates.
  *
- *       ⚠️ IMPORTANT (Frontend Usage Rules):
+ *        IMPORTANT (Frontend Usage Rules):
  *       - skills & languages must be sent as JSON string arrays
  *         Example: '["NodeJS","React"]'
  *       - To CLEAR values → send '[]'
