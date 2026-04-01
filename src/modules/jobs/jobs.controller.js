@@ -214,6 +214,22 @@ exports.createJob = async (req, res) => {
       });
     }
 
+    //  CHECK DUPLICATE JOB
+    const existingJob = await prisma.job.findFirst({
+      where: {
+        title: title.trim(),
+        department: department.trim(),
+        location: location.trim(),
+        status: "ACTIVE" // only block active duplicates
+      }
+    });
+
+    if (existingJob) {
+      return res.status(400).json({
+        message: "Job already exists for this role, department, and location"
+      });
+    }
+
     // SKILLS
     const skillsArray = Array.isArray(skills)
       ? skills
